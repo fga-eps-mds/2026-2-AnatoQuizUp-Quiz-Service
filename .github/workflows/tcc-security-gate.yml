@@ -1,0 +1,243 @@
+name: TCC - Security Gate
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+concurrency:
+  group: tcc-security-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  sast-sonar:
+    name: SAST - SonarCloud
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: anatoquizup_quiz_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anatoquizup_quiz_test?schema=public
+      JWT_SECRET_KEY: ci-test-secret
+      INTERNAL_TOKEN: ci-internal-token
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - run: npm ci
+      - run: npm run prisma:generate
+      - run: npx prisma db push --skip-generate
+      - run: npm test -- --coverage --passWithNoTests
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@299e4b793aaa83bf2aba7c9c14bedbb485688ec4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Aguardar SonarCloud Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  sast-codeql:
+    name: SAST - CodeQL
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 
+
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@e429ea58a9912cadc53f8132ad35562b54de1b30 
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-and-quality
+
+      - name: Analisar com CodeQL
+        uses: github/codeql-action/analyze@e429ea58a9912cadc53f8132ad35562b54de1b30 
+        with:
+          category: "/language:javascript-typescript"
+          output: codeql-results
+
+      - name: Bloquear achados High/Critical
+        run: |
+          ACHADOS=$(jq -s '[
+            .[].runs[] | . as $run
+            | ([($run.tool.driver.rules // [])[]] + [($run.tool.extensions // [])[] | (.rules // [])[]])
+            | map({key: .id, value: ((.properties["security-severity"] // "0") | tonumber)})
+            | from_entries as $sev
+            | ($run.results // [])[]
+            | select(($sev[.ruleId] // 0) >= 7.0)
+          ] | length' codeql-results/*.sarif)
+          echo "Achados CodeQL High/Critical: $ACHADOS"
+          if [ "$ACHADOS" -gt 0 ]; then
+            echo "::error::CodeQL encontrou $ACHADOS achado(s) High/Critical."
+            exit 1
+          fi
+
+  sca:
+    name: SCA - npm audit + Trivy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 
+        with:
+          node-version-file: ".nvmrc"
+
+      - run: npm ci
+
+      - name: npm audit (high+)
+        id: npm-audit
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+      - name: npm audit JSON (artefato para M3)
+        if: always()
+        run: npm audit --json > npm-audit-report.json || true
+
+      - name: Trivy filesystem scan
+        id: trivy
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-results.sarif
+          limit-severities-for-sarif: true
+          exit-code: "1"
+
+      - name: Upload SARIF do Trivy
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@e429ea58a9912cadc53f8132ad35562b54de1b30 
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs
+
+      - name: Upload npm audit JSON
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 
+        with:
+          name: npm-audit-report
+          path: npm-audit-report.json
+          retention-days: 30
+
+      - name: Avaliar resultado do SCA
+        if: always()
+        run: |
+          echo "npm audit: ${{ steps.npm-audit.outcome }}"
+          echo "Trivy:     ${{ steps.trivy.outcome }}"
+          if [ "${{ steps.npm-audit.outcome }}" != "success" ] || [ "${{ steps.trivy.outcome }}" != "success" ]; then
+            echo "::error::Vulnerabilidades HIGH/CRITICAL encontradas nas dependências."
+            exit 1
+          fi
+
+  secrets-scan:
+    name: Secrets - Gitleaks
+    runs-on: ubuntu-latest
+
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 
+        with:
+          fetch-depth: 0
+
+      - name: Instalar Gitleaks
+        run: |
+          TARBALL="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$TARBALL" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${TARBALL}"
+          echo "${GITLEAKS_SHA256}  ${TARBALL}" | sha256sum -c -
+          tar -xzf "$TARBALL" gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Gitleaks - commits do PR
+        run: |
+          gitleaks git . \
+            --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" \
+            --redact \
+            --verbose \
+            --report-format sarif \
+            --report-path gitleaks-results.sarif
+
+      - name: Upload SARIF do Gitleaks
+        if: always() && hashFiles('gitleaks-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@e429ea58a9912cadc53f8132ad35562b54de1b30 
+        with:
+          sarif_file: gitleaks-results.sarif
+          category: gitleaks
+
+  security-gate:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [sast-sonar, sast-codeql, sca, secrets-scan]
+
+    steps:
+      - name: Avaliar resultado dos jobs
+        env:
+          SAST_SONAR: ${{ needs.sast-sonar.result }}
+          SAST_CODEQL: ${{ needs.sast-codeql.result }}
+          SCA: ${{ needs.sca.result }}
+          SECRETS_SCAN: ${{ needs.secrets-scan.result }}
+        run: |
+          FAILED=0
+          {
+            echo "## Security Gate"
+            echo ""
+            echo "| Job | Resultado |"
+            echo "|-----|-----------|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for pair in \
+            "sast-sonar:$SAST_SONAR" \
+            "sast-codeql:$SAST_CODEQL" \
+            "sca:$SCA" \
+            "secrets-scan:$SECRETS_SCAN"; do
+            JOB="${pair%%:*}"
+            RESULT="${pair#*:}"
+            echo "| $JOB | $RESULT |" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$RESULT" != "success" ]; then
+              echo "::error::$JOB terminou com resultado '$RESULT'."
+              FAILED=1
+            fi
+          done
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error::Security Gate REPROVADO."
+            exit 1
+          fi
+          echo "::notice::Security Gate APROVADO."
