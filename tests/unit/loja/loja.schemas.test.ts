@@ -28,7 +28,15 @@ describe("Testa Loja Schemas", () => {
     });
 
     test("deve validar todos os tipos de item da loja", () => {
-      for (const tipo of ["ICONE_PERFIL", "MOLDURA", "AVATAR", "TITULO", "PLANO_FUNDO"]) {
+      for (const tipo of [
+        "ICONE_PERFIL",
+        "MOLDURA",
+        "AVATAR",
+        "TITULO",
+        "PLANO_FUNDO",
+        "DICA",
+        "POTENCIALIZADOR",
+      ]) {
         expect(schemaListarCatalogo.safeParse({ tipo }).success).toBe(true);
       }
     });
@@ -89,12 +97,38 @@ describe("Testa Loja Schemas", () => {
   });
 
   describe("schemaComprarItem", () => {
-    test("deve validar compra com itemLojaId", () => {
+    test("deve validar compra com itemLojaId e usar quantidade 1 por padrao", () => {
       const resultado = schemaComprarItem.safeParse({
         itemLojaId: "item-id",
       });
 
       expect(resultado.success).toBe(true);
+
+      if (resultado.success) {
+        expect(resultado.data.quantidade).toBe(1);
+      }
+    });
+
+    test("deve aceitar e converter a quantidade informada", () => {
+      const resultado = schemaComprarItem.safeParse({
+        itemLojaId: "item-id",
+        quantidade: "3",
+      });
+
+      expect(resultado.success).toBe(true);
+
+      if (resultado.success) {
+        expect(resultado.data.quantidade).toBe(3);
+      }
+    });
+
+    test.each([0, -1, 1.5, 100])("deve rejeitar quantidade invalida (%p)", (quantidade) => {
+      const resultado = schemaComprarItem.safeParse({
+        itemLojaId: "item-id",
+        quantidade,
+      });
+
+      expect(resultado.success).toBe(false);
     });
 
     test("deve rejeitar compra sem itemLojaId", () => {

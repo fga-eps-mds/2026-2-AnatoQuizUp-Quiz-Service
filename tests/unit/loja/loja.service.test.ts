@@ -22,6 +22,9 @@ function criarItemLoja(overrides: Partial<ItemLojaBanco> = {}): ItemLojaBanco {
     imagemUrl: null,
     previewImagemUrl: null,
     ativo: true,
+    disponivelNaLoja: true,
+    consumivel: false,
+    efeito: null,
     criadoEm: agora,
     atualizadoEm: agora,
     excluidoEm: null,
@@ -37,7 +40,10 @@ function criarInventario(overrides: Partial<InventarioBanco> = {}): InventarioBa
     id: "inventario-id",
     usuarioId: "usuario-id",
     itemLojaId: itemLoja.id,
+    desbloqueioConquistaId: null,
     equipado: false,
+    origem: "COMPRA",
+    quantidade: 1,
     adquiridoEm: agora,
     criadoEm: agora,
     atualizadoEm: agora,
@@ -71,7 +77,7 @@ describe("Testa Loja Service", () => {
     repository.listarCatalogo.mockResolvedValue({
       data: [item],
       total: 1,
-      itensAdquiridos: new Set([item.id]),
+      quantidadesPossuidas: new Map([[item.id, 1]]),
     });
 
     const resultado = await service.listarCatalogo("usuario-id", {
@@ -99,6 +105,7 @@ describe("Testa Loja Service", () => {
           codigo: item.codigo,
           nome: item.nome,
           adquirido: true,
+          quantidadePossuida: 1,
         }),
       ],
       metadados: {
@@ -116,7 +123,7 @@ describe("Testa Loja Service", () => {
     repository.listarCatalogo.mockResolvedValue({
       data: [item],
       total: 1,
-      itensAdquiridos: new Set(),
+      quantidadesPossuidas: new Map(),
     });
 
     const resultado = await service.listarCatalogo("usuario-id", {});
@@ -124,6 +131,32 @@ describe("Testa Loja Service", () => {
     expect(resultado.dados[0]).toMatchObject({
       id: item.id,
       adquirido: false,
+      quantidadePossuida: 0,
+    });
+  });
+
+  test("deve listar consumivel como nao adquirido mesmo quando o usuario ja possui unidades", async () => {
+    const item = criarItemLoja({
+      id: "dica-id",
+      tipo: TipoItemLoja.DICA,
+      consumivel: true,
+      efeito: "Revela uma dica para a questão.",
+    });
+
+    repository.listarCatalogo.mockResolvedValue({
+      data: [item],
+      total: 1,
+      quantidadesPossuidas: new Map([[item.id, 3]]),
+    });
+
+    const resultado = await service.listarCatalogo("usuario-id", {});
+
+    expect(resultado.dados[0]).toMatchObject({
+      id: item.id,
+      consumivel: true,
+      efeito: "Revela uma dica para a questão.",
+      adquirido: false,
+      quantidadePossuida: 3,
     });
   });
 
@@ -170,17 +203,40 @@ describe("Testa Loja Service", () => {
 
     const resultado = await service.comprar("usuario-id", "item-loja-id");
 
-    expect(repository.comprarItem).toHaveBeenCalledWith("usuario-id", "item-loja-id");
+    expect(repository.comprarItem).toHaveBeenCalledWith("usuario-id", "item-loja-id", 1);
 
     expect(resultado).toEqual({
       mensagem: "Item comprado com sucesso.",
       saldoMoedas: 4900,
+      quantidadeComprada: 1,
       item: expect.objectContaining({
         id: inventario.id,
         item: expect.objectContaining({
           id: inventario.itemLoja.id,
         }),
       }),
+    });
+  });
+
+  test("deve repassar a quantidade ao comprar consumivel", async () => {
+    const itemLoja = criarItemLoja({ tipo: TipoItemLoja.POTENCIALIZADOR, consumivel: true });
+    const inventario = criarInventario({ itemLoja, quantidade: 5 });
+
+    repository.comprarItem.mockResolvedValue({
+      saldoMoedas: 100,
+      inventarioItem: inventario,
+    });
+
+    const resultado = await service.comprar("usuario-id", "item-loja-id", 3);
+
+    expect(repository.comprarItem).toHaveBeenCalledWith("usuario-id", "item-loja-id", 3);
+    expect(resultado).toMatchObject({
+      saldoMoedas: 100,
+      quantidadeComprada: 3,
+      item: {
+        quantidade: 5,
+        item: { consumivel: true },
+      },
     });
   });
 

@@ -31,15 +31,15 @@ export class LojaService {
 
     const paginacao = resolverParametrosPaginacao(query);
 
-    // itensAdquiridos e um Set com os ids que o usuario ja possui.
-    const { data, total, itensAdquiridos } = await this.lojaRepository.listarCatalogo(
+    // quantidadesPossuidas mapeia itemLojaId -> unidades que o usuario ja tem.
+    const { data, total, quantidadesPossuidas } = await this.lojaRepository.listarCatalogo(
       usuarioId,
       paginacao,
       query,
     );
 
     return {
-      dados: data.map((item) => this.converterItemLoja(item, itensAdquiridos.has(item.id))),
+      dados: data.map((item) => this.converterItemLoja(item, quantidadesPossuidas.get(item.id))),
       metadados: montarMetadadosPaginacao(paginacao, total),
     };
   }
@@ -72,16 +72,22 @@ export class LojaService {
    *
    * @param usuarioId Usuario autenticado que esta comprando.
    * @param itemLojaId Item desejado.
-   * @returns Mensagem, saldo atualizado e o item ja no inventario.
+   * @param quantidade Unidades desejadas (padrao 1; so consumiveis aceitam mais).
+   * @returns Mensagem, saldo atualizado, unidades compradas e o item ja no inventario.
    */
-  async comprar(usuarioId: string | undefined, itemLojaId: string): Promise<CompraItemDto> {
+  async comprar(
+    usuarioId: string | undefined,
+    itemLojaId: string,
+    quantidade = 1,
+  ): Promise<CompraItemDto> {
     this.validarUsuarioAutenticado(usuarioId);
 
-    const compra = await this.lojaRepository.comprarItem(usuarioId, itemLojaId);
+    const compra = await this.lojaRepository.comprarItem(usuarioId, itemLojaId, quantidade);
 
     return {
       mensagem: "Item comprado com sucesso.",
       saldoMoedas: compra.saldoMoedas,
+      quantidadeComprada: quantidade,
       item: this.converterInventario(compra.inventarioItem),
     };
   }
@@ -97,8 +103,9 @@ export class LojaService {
     }
   }
 
-  // Converte o item do banco no DTO do catalogo, acrescentando o flag "adquirido".
-  private converterItemLoja(item: ItemLojaBanco, adquirido: boolean): ItemLojaDto {
+  // Converte o item do banco no DTO do catalogo. "adquirido" so vale para cosmeticos
+  // (consumiveis podem ser comprados de novo); "quantidadePossuida" vale para todos.
+  private converterItemLoja(item: ItemLojaBanco, quantidadePossuida = 0): ItemLojaDto {
     return {
       id: item.id,
       codigo: item.codigo,
@@ -111,7 +118,10 @@ export class LojaService {
       previewImagemUrl: item.previewImagemUrl,
       ativo: item.ativo,
       disponivelNaLoja: item.disponivelNaLoja,
-      adquirido,
+      consumivel: item.consumivel,
+      efeito: item.efeito,
+      adquirido: !item.consumivel && quantidadePossuida > 0,
+      quantidadePossuida,
     };
   }
 
@@ -121,6 +131,7 @@ export class LojaService {
       id: item.id,
       equipado: item.equipado,
       origem: item.origem,
+      quantidade: item.quantidade,
       adquiridoEm: item.adquiridoEm,
       item: {
         id: item.itemLoja.id,
@@ -134,6 +145,8 @@ export class LojaService {
         previewImagemUrl: item.itemLoja.previewImagemUrl,
         ativo: item.itemLoja.ativo,
         disponivelNaLoja: item.itemLoja.disponivelNaLoja,
+        consumivel: item.itemLoja.consumivel,
+        efeito: item.itemLoja.efeito,
       },
     };
   }

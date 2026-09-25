@@ -17,6 +17,7 @@ jest.mock("@/config/db", () => ({
       findMany: jest.fn(),
       count: jest.fn(),
       createMany: jest.fn(),
+      upsert: jest.fn(),
       findUniqueOrThrow: jest.fn(),
     },
 
@@ -48,6 +49,8 @@ function criarItemLoja(overrides = {}) {
     imagemUrl: null,
     previewImagemUrl: null,
     disponivelNaLoja: true,
+    consumivel: false,
+    efeito: null,
     ativo: true,
     criadoEm: agora,
     atualizadoEm: agora,
@@ -64,6 +67,7 @@ function criarInventario(itemLoja = criarItemLoja()) {
     usuarioId: "usuario-id",
     itemLojaId: itemLoja.id,
     equipado: false,
+    quantidade: 1,
     adquiridoEm: agora,
     criadoEm: agora,
     atualizadoEm: agora,
@@ -90,6 +94,7 @@ describe("Testa Loja Repository", () => {
     (prisma.inventarioItem.findMany as jest.Mock).mockResolvedValue([
       {
         itemLojaId: item.id,
+        quantidade: 1,
       },
     ]);
 
@@ -137,13 +142,14 @@ describe("Testa Loja Repository", () => {
       },
       select: {
         itemLojaId: true,
+        quantidade: true,
       },
     });
 
     expect(resultado).toEqual({
       data: registros,
       total: totalRegistros,
-      itensAdquiridos: new Set([item.id]),
+      quantidadesPossuidas: new Map([[item.id, 1]]),
     });
   });
 
@@ -259,6 +265,7 @@ describe("Testa Loja Repository", () => {
         usuarioId: "usuario-id",
         itemLojaId: item.id,
         quantidade: -item.precoMoedas,
+        quantidadeItem: 1,
         fonte: FonteMoeda.COMPRA_ITEM,
         descricao: `Compra do item: ${item.nome}`,
       },
@@ -376,6 +383,173 @@ describe("Testa Loja Repository", () => {
     await expect(repository.comprarItem("usuario-id", item.id)).rejects.toBeInstanceOf(
       ErroAplicacao,
     );
+
+    expect(tx.transacaoMoeda.create).not.toHaveBeenCalled();
+  });
+
+  test("deve comprar varias unidades de um consumivel somando no inventario", async () => {
+    const item = criarItemLoja({
+      id: "tempo-extra-id",
+      nome: "Tempo Extra",
+      tipo: TipoItemLoja.POTENCIALIZADOR,
+      consumivel: true,
+      precoMoedas: 60,
+    });
+    const inventario = { ...criarInventario(item), quantidade: 5 };
+
+    const tx = {
+      itemLoja: {
+        findUnique: jest.fn().mockResolvedValue(item),
+      },
+      inventarioItem: {
+        upsert: jest.fn().mockResolvedValue(inventario),
+        createMany: jest.fn(),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(inventario),
+      },
+      carteiraMoedas: {
+        upsert: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue({ saldo: 20 }),
+      },
+      transacaoMoeda: {
+        create: jest.fn().mockResolvedValue({}),
+      },
+    };
+
+    transactionMock.mockImplementation(async (callback) => callback(tx));
+
+    const resultado = await repository.comprarItem("usuario-id", item.id, 3);
+
+    expect(tx.inventarioItem.createMany).not.toHaveBeenCalled();
+    expect(tx.inventarioItem.upsert).toHaveBeenCalledWith({
+      where: {
+        usuarioId_itemLojaId: {
+          usuarioId: "usuario-id",
+          itemLojaId: item.id,
+        },
+      },
+      create: {
+        usuarioId: "usuario-id",
+        itemLojaId: item.id,
+        origem: "COMPRA",
+        quantidade: 3,
+      },
+      update: {
+        quantidade: {
+          increment: 3,
+        },
+      },
+    });
+
+    // Preco total = 60 x 3 = 180.
+    expect(tx.carteiraMoedas.updateMany).toHaveBeenCalledWith({
+      where: {
+        usuarioId: "usuario-id",
+        saldo: {
+          gte: 180,
+        },
+      },
+      data: {
+        saldo: {
+          decrement: 180,
+        },
+      },
+    });
+
+    expect(tx.transacaoMoeda.create).toHaveBeenCalledWith({
+      data: {
+        usuarioId: "usuario-id",
+        itemLojaId: item.id,
+        quantidade: -180,
+        quantidadeItem: 3,
+        fonte: FonteMoeda.COMPRA_ITEM,
+        descricao: "Compra do item: Tempo Extra (x3)",
+      },
+    });
+
+    expect(resultado).toEqual({
+      saldoMoedas: 20,
+      inventarioItem: inventario,
+    });
+  });
+
+  test("deve recusar mais de uma unidade de um cosmetico sem alterar nada", async () => {
+    const item = criarItemLoja();
+
+    const tx = {
+      itemLoja: {
+        findUnique: jest.fn().mockResolvedValue(item),
+      },
+      inventarioItem: {
+        createMany: jest.fn(),
+        upsert: jest.fn(),
+      },
+      carteiraMoedas: {
+        upsert: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      transacaoMoeda: {
+        create: jest.fn(),
+      },
+    };
+
+    transactionMock.mockImplementation(async (callback) => callback(tx));
+
+    await expect(repository.comprarItem("usuario-id", item.id, 2)).rejects.toMatchObject({
+      codigoStatus: 422,
+    });
+
+    expect(tx.inventarioItem.createMany).not.toHaveBeenCalled();
+    expect(tx.inventarioItem.upsert).not.toHaveBeenCalled();
+    expect(tx.carteiraMoedas.updateMany).not.toHaveBeenCalled();
+    expect(tx.transacaoMoeda.create).not.toHaveBeenCalled();
+  });
+
+  test("deve recusar compra de item exclusivo de conquista", async () => {
+    const item = criarItemLoja({ disponivelNaLoja: false });
+
+    const tx = {
+      itemLoja: {
+        findUnique: jest.fn().mockResolvedValue(item),
+      },
+    };
+
+    transactionMock.mockImplementation(async (callback) => callback(tx));
+
+    await expect(repository.comprarItem("usuario-id", item.id)).rejects.toMatchObject({
+      codigoStatus: 422,
+    });
+  });
+
+  test("deve lançar erro de saldo insuficiente ao comprar consumivel sem registrar a compra", async () => {
+    const item = criarItemLoja({
+      tipo: TipoItemLoja.DICA,
+      consumivel: true,
+      precoMoedas: 50,
+    });
+
+    const tx = {
+      itemLoja: {
+        findUnique: jest.fn().mockResolvedValue(item),
+      },
+      inventarioItem: {
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+      carteiraMoedas: {
+        upsert: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      transacaoMoeda: {
+        create: jest.fn(),
+      },
+    };
+
+    transactionMock.mockImplementation(async (callback) => callback(tx));
+
+    await expect(repository.comprarItem("usuario-id", item.id, 2)).rejects.toMatchObject({
+      codigoStatus: 422,
+      message: "Saldo de moedas insuficiente para comprar este item.",
+    });
 
     expect(tx.transacaoMoeda.create).not.toHaveBeenCalled();
   });

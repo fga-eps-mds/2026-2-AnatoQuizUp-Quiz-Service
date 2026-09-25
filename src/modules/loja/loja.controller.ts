@@ -7,7 +7,7 @@ import type {
   ListarInventarioQueryDto,
 } from "./loja.schemas";
 
-// Controller HTTP da loja: catalogo de cosmeticos, inventario do aluno e compra.
+// Controller HTTP da loja: catalogo (cosmeticos e consumiveis), inventario do aluno e compra.
 export class LojaController {
   constructor(private readonly lojaService: LojaService) {}
 
@@ -59,7 +59,7 @@ export class LojaController {
   /**
    * POST compra um item; o service valida saldo e debita as moedas.
    *
-   * @param request Requisicao com o itemLojaId no corpo (usuario vem do token).
+   * @param request Requisicao com itemLojaId e quantidade no corpo (usuario vem do token).
    * @param response Resposta com o resultado da compra.
    * @param next Repasse de erro ao middleware central.
    */
@@ -69,7 +69,11 @@ export class LojaController {
     next: NextFunction,
   ) => {
     try {
-      const compra = await this.lojaService.comprar(request.usuario?.id, request.body.itemLojaId);
+      const compra = await this.lojaService.comprar(
+        request.usuario?.id,
+        request.body.itemLojaId,
+        request.body.quantidade,
+      );
 
       return response.status(200).json(compra);
     } catch (error) {

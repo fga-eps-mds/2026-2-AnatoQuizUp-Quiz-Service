@@ -22,7 +22,7 @@ export class LojaRepository {
    * @param usuarioId Usuario (para cruzar com o inventario).
    * @param paginacao Skip/take.
    * @param filtros Filtro opcional por tipo de item.
-   * @returns Pagina de itens, total e o conjunto de ids ja adquiridos pelo usuario.
+   * @returns Pagina de itens, total e as quantidades que o usuario ja possui de cada item.
    */
   async listarCatalogo(
     usuarioId: string,
@@ -56,16 +56,20 @@ export class LojaRepository {
       },
       select: {
         itemLojaId: true,
+        quantidade: true,
       },
     });
 
-    // Conjunto de ids ja no inventario, para o service marcar "adquirido" no catalogo.
-    const itensAdquiridos = new Set(inventario.map((item) => item.itemLojaId));
+    // Mapa itemLojaId -> unidades possuidas, para o service marcar "adquirido" e
+    // informar quantas unidades de cada consumivel o usuario ja tem.
+    const quantidadesPossuidas = new Map(
+      inventario.map((item) => [item.itemLojaId, item.quantidade]),
+    );
 
     return {
       data: itens,
       total,
-      itensAdquiridos,
+      quantidadesPossuidas,
     };
   }
 
@@ -100,16 +104,19 @@ export class LojaRepository {
   /**
    * Compra um item da loja de forma atomica e segura contra concorrencia.
    *
-   * Valida o item (existe, ativo, compravel), evita compra duplicada (createMany com
-   * skipDuplicates), debita o saldo so se for suficiente (updateMany condicional) e
-   * registra a transacao de moedas. Qualquer falha aborta toda a compra.
+   * Valida o item (existe, ativo, compravel) e a quantidade, debita o preco total
+   * so se o saldo for suficiente (updateMany condicional) e registra a transacao.
+   * - Cosmetico: uma unica unidade; comprar de novo gera conflito (409).
+   * - Consumivel: pode ser comprado varias vezes; a quantidade e somada no inventario.
+   * Qualquer falha aborta toda a compra, sem alterar saldo nem inventario.
    *
    * @param usuarioId Comprador.
    * @param itemLojaId Item desejado.
-   * @returns Saldo atualizado e o item adicionado ao inventario.
+   * @param quantidade Unidades desejadas (so consumiveis aceitam mais de 1).
+   * @returns Saldo atualizado e o registro do item no inventario.
    * @throws ErroAplicacao 404/422/409 conforme item invalido, saldo ou duplicidade.
    */
-  async comprarItem(usuarioId: string, itemLojaId: string) {
+  async comprarItem(usuarioId: string, itemLojaId: string, quantidade = 1) {
     return await prisma.$transaction(async (tx) => {
       const item = await tx.itemLoja.findUnique({
         where: { id: itemLojaId },
@@ -140,25 +147,57 @@ export class LojaRepository {
         });
       }
 
-      // Adiciona ao inventario; skipDuplicates impede comprar o mesmo item duas vezes.
-      const inventarioCriado = await tx.inventarioItem.createMany({
-        data: [
-          {
+      // Cosmeticos sao unicos: nao faz sentido comprar mais de uma unidade.
+      if (!item.consumivel && quantidade !== 1) {
+        throw new ErroAplicacao({
+          codigoStatus: 422,
+          codigo: CodigoDeErro.REQUISICAO_INVALIDA,
+          mensagem: "Este item so pode ser comprado uma unidade por vez.",
+        });
+      }
+
+      if (item.consumivel) {
+        // Consumivel: cria o registro ou soma as unidades ao que o aluno ja tem.
+        await tx.inventarioItem.upsert({
+          where: {
+            usuarioId_itemLojaId: {
+              usuarioId,
+              itemLojaId,
+            },
+          },
+          create: {
             usuarioId,
             itemLojaId,
             origem: OrigemItemInventario.COMPRA,
+            quantidade,
           },
-        ],
-        skipDuplicates: true,
-      });
-
-      // Nada criado = ja possui o item: conflito.
-      if (inventarioCriado.count === 0) {
-        throw new ErroAplicacao({
-          codigoStatus: 409,
-          codigo: CodigoDeErro.CONFLITO,
-          mensagem: "Este item ja foi adquirido pelo aluno.",
+          update: {
+            quantidade: {
+              increment: quantidade,
+            },
+          },
         });
+      } else {
+        // Cosmetico: adiciona ao inventario; skipDuplicates impede comprar duas vezes.
+        const inventarioCriado = await tx.inventarioItem.createMany({
+          data: [
+            {
+              usuarioId,
+              itemLojaId,
+              origem: OrigemItemInventario.COMPRA,
+            },
+          ],
+          skipDuplicates: true,
+        });
+
+        // Nada criado = ja possui o item: conflito.
+        if (inventarioCriado.count === 0) {
+          throw new ErroAplicacao({
+            codigoStatus: 409,
+            codigo: CodigoDeErro.CONFLITO,
+            mensagem: "Este item ja foi adquirido pelo aluno.",
+          });
+        }
       }
 
       // Garante a carteira antes de tentar debitar.
@@ -171,23 +210,26 @@ export class LojaRepository {
         update: {},
       });
 
-      // Debita o preco somente se o saldo for suficiente (condicao no proprio where),
-      // o que evita corrida de saldo negativo sem precisar de lock explicito.
+      const precoTotal = item.precoMoedas * quantidade;
+
+      // Debita o preco total somente se o saldo for suficiente (condicao no proprio
+      // where), o que evita corrida de saldo negativo sem precisar de lock explicito.
       const carteiraAtualizada = await tx.carteiraMoedas.updateMany({
         where: {
           usuarioId,
           saldo: {
-            gte: item.precoMoedas,
+            gte: precoTotal,
           },
         },
         data: {
           saldo: {
-            decrement: item.precoMoedas,
+            decrement: precoTotal,
           },
         },
       });
 
-      // Nenhuma linha atualizada = saldo insuficiente.
+      // Nenhuma linha atualizada = saldo insuficiente. O erro desfaz a transacao,
+      // entao o inventario tambem volta ao estado anterior.
       if (carteiraAtualizada.count === 0) {
         throw new ErroAplicacao({
           codigoStatus: 422,
@@ -196,14 +238,18 @@ export class LojaRepository {
         });
       }
 
-      // Registra a transacao de moedas (negativa, pois e um gasto).
+      // Registra a compra (valor negativo, pois e um gasto) para consulta no historico.
       await tx.transacaoMoeda.create({
         data: {
           usuarioId,
           itemLojaId,
-          quantidade: -item.precoMoedas,
+          quantidade: -precoTotal,
+          quantidadeItem: quantidade,
           fonte: FonteMoeda.COMPRA_ITEM,
-          descricao: `Compra do item: ${item.nome}`,
+          descricao:
+            quantidade > 1
+              ? `Compra do item: ${item.nome} (x${quantidade})`
+              : `Compra do item: ${item.nome}`,
         },
       });
 
