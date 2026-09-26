@@ -18,6 +18,7 @@ import { type ResolucaoQuestaoUsuarioDto } from "./dto/responses/resolucao_quest
 import { converterResolucaoQuestaoBancoToApi } from "./dto/mappers/historico_quiz.mapper";
 import type { Dificuldade } from "@prisma/client";
 import type { ConquistaService } from "../conquistas/conquistas.service";
+import type { UsoItemRepository } from "../loja/uso-item.repository";
 
 // Recompensa em moedas por acerto, conforme a dificuldade da questao.
 const MOEDAS_POR_DIFICULDADE: Record<Dificuldade, number> = {
@@ -37,6 +38,7 @@ export class QuizService {
   constructor(
     private readonly quizRepository: QuizRepository,
     private readonly conquistaService: ConquistaService,
+    private readonly usoItemRepository?: UsoItemRepository,
   ) {}
 
   /**
@@ -144,6 +146,7 @@ export class QuizService {
 
     let moedasConcedidas = 0;
     let moedasJaConcedidas = false;
+    let potencializadorAplicado: FeedbackQuizDto["potencializadorAplicado"] = null;
 
     // Moedas so no primeiro acerto da questao (o repository evita pagar duas vezes).
     if (correcao && alunoPodeReceberRecompensas) {
@@ -155,6 +158,24 @@ export class QuizService {
 
       moedasConcedidas = resultado.moedasConcedidas;
       moedasJaConcedidas = resultado.moedasJaConcedidas;
+
+      // O Cafe do Foco so e gasto no primeiro acerto que realmente recebeu ATP.
+      // Assim, acertar de novo uma questao ja premiada nao desperdiça o item.
+      if (resultado.moedasConcedidas > 0 && this.usoItemRepository) {
+        const bonus = await this.usoItemRepository.aplicarCafeNoAcerto(
+          id_usuario,
+          data.questaoId,
+          resultado.moedasConcedidas,
+        );
+
+        if (bonus.bonusMoedas > 0) {
+          moedasConcedidas += bonus.bonusMoedas;
+          potencializadorAplicado = {
+            nome: bonus.uso?.itemLoja.nome ?? "Cafe do Foco",
+            bonusMoedas: bonus.bonusMoedas,
+          };
+        }
+      }
     }
 
     const saldoMoedas = await this.quizRepository.buscarSaldoMoedas(id_usuario);
@@ -167,6 +188,7 @@ export class QuizService {
       moedasConcedidas,
       moedasJaConcedidas,
       conquistasDesbloqueadas: conquistas,
+      potencializadorAplicado,
     };
   }
 

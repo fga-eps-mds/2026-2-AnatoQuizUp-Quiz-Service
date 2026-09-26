@@ -2,6 +2,7 @@ import {
   PrismaClient,
   TierConquista,
   TipoConquista,
+  TipoEfeitoItem,
   TipoItemLoja,
 } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
@@ -14,8 +15,7 @@ const iconeAnatomia = (nome: string) =>
 const avatar = (seed: string, skinColor: string) =>
   `https://api.dicebear.com/9.x/avataaars/svg?seed=${seed}&skinColor=${skinColor}`;
 
-const GRADIENTE_OURO =
-  "linear-gradient(135deg, #FCD34D 0%, #D4AF37 100%)";
+const GRADIENTE_OURO = "linear-gradient(135deg, #FCD34D 0%, #D4AF37 100%)";
 
 const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
   {
@@ -179,8 +179,7 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
   {
     codigo: "fundo-textura-anatomica",
     nome: "Textura Anatômica",
-    descricao:
-      "Plano de fundo com gradiente inspirado na identidade do AnatoQuizUp.",
+    descricao: "Plano de fundo com gradiente inspirado na identidade do AnatoQuizUp.",
     tipo: TipoItemLoja.PLANO_FUNDO,
     precoMoedas: 350,
     valor: "linear-gradient(135deg, #0A1128 0%, #00214d 100%)",
@@ -252,7 +251,8 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     codigo: "potencializador-cafe-do-foco",
     nome: "Café do Foco",
     descricao: "Energia extra para a próxima rodada de estudos.",
-    efeito: "Dobra seus pontos na próxima sessão.",
+    efeito: "Dobra as ATP do proximo acerto elegivel.",
+    tipoEfeito: TipoEfeitoItem.DOBRAR_MOEDAS_PROXIMO_ACERTO,
     tipo: TipoItemLoja.POTENCIALIZADOR,
     consumivel: true,
     precoMoedas: 120,
@@ -310,8 +310,7 @@ async function main() {
     where: { codigo: "avatar-explorador-anatomia" },
     update: {
       nome: "Explorador da Anatomia",
-      descricao:
-        "Avatar exclusivo para quem conquistou seus primeiros cinco acertos.",
+      descricao: "Avatar exclusivo para quem conquistou seus primeiros cinco acertos.",
       tipo: TipoItemLoja.AVATAR,
       precoMoedas: 0,
       imagemUrl: avatar("ExploradorAnatomia", "edb98a"),
@@ -323,8 +322,7 @@ async function main() {
     create: {
       codigo: "avatar-explorador-anatomia",
       nome: "Explorador da Anatomia",
-      descricao:
-        "Avatar exclusivo para quem conquistou seus primeiros cinco acertos.",
+      descricao: "Avatar exclusivo para quem conquistou seus primeiros cinco acertos.",
       tipo: TipoItemLoja.AVATAR,
       precoMoedas: 0,
       imagemUrl: avatar("ExploradorAnatomia", "edb98a"),
@@ -351,9 +349,7 @@ async function main() {
     },
   });
 
-  console.log(
-    `Catálogo sincronizado: ${itensCatalogo.length} itens públicos e 1 item exclusivo.`,
-  );
+  console.log(`Catálogo sincronizado: ${itensCatalogo.length} itens públicos e 1 item exclusivo.`);
 }
 
 main()

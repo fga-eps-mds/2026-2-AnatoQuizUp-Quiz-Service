@@ -8,13 +8,17 @@ import { ErroAplicacao } from "@/shared/errors/erro-aplicacao";
 import { MENSAGENS } from "@/shared/constants/mensagens";
 
 import type { InventarioBanco, ItemLojaBanco, LojaRepository } from "./loja.repository";
-import type { CompraItemDto, InventarioItemDto, ItemLojaDto } from "./dto/loja.dto";
+import type { UsoItemRepository } from "./uso-item.repository";
+import type { CompraItemDto, InventarioItemDto, ItemLojaDto, UsoItemDto } from "./dto/loja.dto";
 import type { ListarCatalogoQueryDto, ListarInventarioQueryDto } from "./loja.schemas";
 
 // Service da loja: orquestra catalogo, inventario e compra, convertendo os registros
 // do banco para os DTOs de resposta. Exige usuario autenticado em todas as operacoes.
 export class LojaService {
-  constructor(private readonly lojaRepository: LojaRepository) {}
+  constructor(
+    private readonly lojaRepository: LojaRepository,
+    private readonly usoItemRepository?: UsoItemRepository,
+  ) {}
 
   /**
    * Lista paginada do catalogo, marcando cada item como adquirido ou nao pelo usuario.
@@ -92,6 +96,52 @@ export class LojaService {
     };
   }
 
+  /** Ativa uma unidade do Cafe do Foco para dobrar o proximo acerto elegivel. */
+  async usarItem(usuarioId: string | undefined, itemLojaId: string) {
+    this.validarUsuarioAutenticado(usuarioId);
+
+    if (!this.usoItemRepository) {
+      throw new ErroAplicacao({
+        codigoStatus: 500,
+        codigo: CodigoDeErro.ERRO_INTERNO,
+        mensagem: MENSAGENS.erroInterno,
+      });
+    }
+
+    const { uso, quantidadeRestante } = await this.usoItemRepository.ativarPotencializador(
+      usuarioId,
+      itemLojaId,
+    );
+
+    return {
+      mensagem: "Cafe do Foco ativado. Seu proximo acerto valera ATP em dobro.",
+      quantidadeRestante,
+      uso: this.converterUso(uso),
+    };
+  }
+
+  /** Registro consultavel agora; a tela unificada de compras e usos e da issue #40. */
+  async listarHistoricoUsos(
+    usuarioId: string | undefined,
+    query: ListarInventarioQueryDto,
+  ): Promise<RespostaPaginada<UsoItemDto>> {
+    this.validarUsuarioAutenticado(usuarioId);
+    if (!this.usoItemRepository) {
+      throw new ErroAplicacao({
+        codigoStatus: 500,
+        codigo: CodigoDeErro.ERRO_INTERNO,
+        mensagem: MENSAGENS.erroInterno,
+      });
+    }
+    const paginacao = resolverParametrosPaginacao(query);
+    const { data, total } = await this.usoItemRepository.listarHistorico(usuarioId, paginacao);
+
+    return {
+      dados: data.map((uso) => this.converterUso(uso)),
+      metadados: montarMetadadosPaginacao(paginacao, total),
+    };
+  }
+
   // Assercao de tipo: garante usuario autenticado (e estreita o tipo para string).
   private validarUsuarioAutenticado(usuarioId: string | undefined): asserts usuarioId is string {
     if (!usuarioId) {
@@ -148,6 +198,27 @@ export class LojaService {
         consumivel: item.itemLoja.consumivel,
         efeito: item.itemLoja.efeito,
       },
+    };
+  }
+
+  private converterUso(uso: {
+    id: string;
+    itemLojaId: string;
+    status: "ATIVO" | "APLICADO";
+    ativadoEm: Date;
+    aplicadoEm: Date | null;
+    questaoId: string | null;
+    itemLoja: { nome: string; efeito: string | null };
+  }): UsoItemDto {
+    return {
+      id: uso.id,
+      itemLojaId: uso.itemLojaId,
+      itemNome: uso.itemLoja.nome,
+      efeito: uso.itemLoja.efeito ?? "Potencializador ativo.",
+      status: uso.status as "ATIVO" | "APLICADO",
+      ativadoEm: uso.ativadoEm,
+      aplicadoEm: uso.aplicadoEm,
+      questaoId: uso.questaoId,
     };
   }
 }

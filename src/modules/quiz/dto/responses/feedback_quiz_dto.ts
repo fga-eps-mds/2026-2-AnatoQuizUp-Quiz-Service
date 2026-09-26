@@ -11,6 +11,10 @@ export type FeedbackQuizDto = {
   moedasConcedidas: number;
   moedasJaConcedidas: boolean;
   conquistasDesbloqueadas: ConquistaDesbloqueadaDto[];
+  potencializadorAplicado: {
+    nome: string;
+    bonusMoedas: number;
+  } | null;
 };
 
 // Resposta do endpoint de saldo de moedas.

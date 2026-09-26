@@ -39,8 +39,16 @@ export const schemaComprarItem = z.object({
     .number()
     .int("A quantidade deve ser um numero inteiro.")
     .min(1, "A quantidade minima e 1.")
-    .max(QUANTIDADE_MAXIMA_POR_COMPRA, `A quantidade maxima por compra e ${QUANTIDADE_MAXIMA_POR_COMPRA}.`)
+    .max(
+      QUANTIDADE_MAXIMA_POR_COMPRA,
+      `A quantidade maxima por compra e ${QUANTIDADE_MAXIMA_POR_COMPRA}.`,
+    )
     .default(1),
+});
+
+// Ativar item utiliza uma unidade do inventario; a quantidade e sempre uma.
+export const schemaUsarItem = z.object({
+  itemLojaId: z.string().trim().min(1, "ID do item e obrigatorio."),
 });
 
 // Tipos inferidos a partir dos schemas (fonte unica de verdade do formato).
@@ -49,3 +57,4 @@ export type ListarCatalogoQueryDto = z.infer<typeof schemaListarCatalogo>;
 export type ListarInventarioQueryDto = z.infer<typeof schemaListarInventario>;
 
 export type ComprarItemDto = z.infer<typeof schemaComprarItem>;
+export type UsarItemDto = z.infer<typeof schemaUsarItem>;

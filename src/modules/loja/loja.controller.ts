@@ -5,6 +5,7 @@ import type {
   ComprarItemDto,
   ListarCatalogoQueryDto,
   ListarInventarioQueryDto,
+  UsarItemDto,
 } from "./loja.schemas";
 
 // Controller HTTP da loja: catalogo (cosmeticos e consumiveis), inventario do aluno e compra.
@@ -76,6 +77,35 @@ export class LojaController {
       );
 
       return response.status(200).json(compra);
+    } catch (error) {
+      return next(error);
+    }
+  };
+
+  usarItem = async (
+    request: Request<unknown, unknown, UsarItemDto>,
+    response: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const uso = await this.lojaService.usarItem(request.usuario?.id, request.body.itemLojaId);
+      return response.status(200).json(uso);
+    } catch (error) {
+      return next(error);
+    }
+  };
+
+  listarHistoricoUsos = async (
+    request: Request<unknown, unknown, unknown, ListarInventarioQueryDto>,
+    response: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const historico = await this.lojaService.listarHistoricoUsos(
+        request.usuario?.id,
+        request.query,
+      );
+      return response.status(200).json(historico);
     } catch (error) {
       return next(error);
     }
