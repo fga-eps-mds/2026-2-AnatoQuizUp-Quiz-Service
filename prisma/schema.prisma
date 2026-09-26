@@ -66,6 +66,8 @@ enum TipoItemLoja {
   TITULO
   PLANO_FUNDO
   MOLDURA
+  DICA
+  POTENCIALIZADOR
 }
 
 enum OrigemItemInventario {
@@ -209,6 +211,12 @@ model ItemLoja {
   ativo            Boolean @default(true)
   disponivelNaLoja Boolean @default(true)
 
+  // Consumivel (DICA/POTENCIALIZADOR) pode ser comprado varias vezes e acumula
+  // quantidade no inventario; cosmeticos continuam com uma unica unidade.
+  consumivel Boolean @default(false)
+  // Texto do efeito exibido na loja (ex.: "+30 segundos na questao").
+  efeito     String?
+
   inventarios          InventarioItem[]
   transacoesMoedas     TransacaoMoeda[]
   recompensasConquista RecompensaItemConquista[]
@@ -232,6 +240,9 @@ model InventarioItem {
 
   equipado Boolean              @default(false)
   origem   OrigemItemInventario @default(COMPRA)
+
+  // Unidades possuidas; so passa de 1 em itens consumiveis.
+  quantidade Int @default(1)
 
   adquiridoEm DateTime @default(now())
 
@@ -261,6 +272,9 @@ model TransacaoMoeda {
   quantidade Int
   fonte      FonteMoeda @default(ACERTO_QUESTAO)
 
+  // Unidades compradas nesta transacao (so em COMPRA_ITEM).
+  quantidadeItem Int?
+
   descricao String?
 
   carteira CarteiraMoedas @relation(fields: [usuarioId], references: [usuarioId], onDelete: Restrict)
@@ -273,7 +287,6 @@ model TransacaoMoeda {
 
   @@unique([usuarioId, questaoId, fonte])
   @@unique([usuarioId, desbloqueioId, fonte])
-  @@unique([usuarioId, itemLojaId, fonte])
   @@index([usuarioId])
   @@index([questaoId])
   @@index([itemLojaId])

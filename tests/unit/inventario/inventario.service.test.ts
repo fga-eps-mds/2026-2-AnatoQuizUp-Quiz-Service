@@ -44,6 +44,26 @@ describe("InventarioService", () => {
       });
     });
 
+    it("deve recusar equipar item consumível sem alterar o inventário", async () => {
+      repositoryMock.buscarItemNoInventario.mockResolvedValue({
+        id: "inv-dica",
+        usuarioId: "user-1",
+        itemLojaId: "dica-1",
+        equipado: false,
+        adquiridoEm: new Date(),
+        criadoEm: new Date(),
+        atualizadoEm: new Date(),
+        excluidoEm: null,
+        itemLoja: { nome: "Vacina da Dica", tipo: TipoItemLoja.DICA, consumivel: true } as ItemLoja,
+      } as never);
+
+      await expect(service.equiparItem("user-1", "dica-1")).rejects.toMatchObject({
+        codigoStatus: 400,
+        message: "Itens consumíveis não podem ser equipados.",
+      });
+      expect(repositoryMock.equiparItemTransacao).not.toHaveBeenCalled();
+    });
+
     it("deve equipar o item com sucesso se as validações passarem", async () => {
       const mockItemInventario = {
         id: "inv-1",

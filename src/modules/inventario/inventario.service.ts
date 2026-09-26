@@ -9,7 +9,7 @@ export class InventarioService {
   /**
    * Equipa um item do inventario do usuario.
    *
-   * Recusa se o item nao esta no inventario (404) ou ja esta equipado (400). Ao
+   * Recusa se o item nao esta no inventario (404), e consumivel ou ja esta equipado (400). Ao
    * equipar, o repository desequipa outros do mesmo tipo (so um por categoria).
    *
    * @param usuarioId Dono do inventario.
@@ -28,6 +28,15 @@ export class InventarioService {
         codigo: "NAO_ENCONTRADO",
         codigoStatus: 404,
         mensagem: "Item não encontrado no seu inventário.",
+      });
+    }
+
+    // Consumiveis (dicas/potencializadores) sao usados no quiz, nao equipados no perfil.
+    if (itemInventario.itemLoja.consumivel) {
+      throw new ErroAplicacao({
+        codigo: "REQUISICAO_INVALIDA",
+        codigoStatus: 400,
+        mensagem: "Itens consumíveis não podem ser equipados.",
       });
     }
 
@@ -128,6 +137,7 @@ export class InventarioService {
       inventarioId: inv.id,
       equipado: inv.equipado,
       origem: inv.origem,
+      quantidade: inv.quantidade,
       ...inv.itemLoja,
     }));
 

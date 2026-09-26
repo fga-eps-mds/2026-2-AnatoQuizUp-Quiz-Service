@@ -174,6 +174,7 @@ describe("Testa Loja Controller", () => {
       },
       body: {
         itemLojaId: "item-id",
+        quantidade: 2,
       },
     } as unknown as Request;
 
@@ -181,7 +182,7 @@ describe("Testa Loja Controller", () => {
 
     await controller.comprar(request, response, next);
 
-    expect(lojaService.comprar).toHaveBeenCalledWith("usuario-id", "item-id");
+    expect(lojaService.comprar).toHaveBeenCalledWith("usuario-id", "item-id", 2);
     expect(status).toHaveBeenCalledWith(200);
     expect(json).toHaveBeenCalledWith(respostaMock);
   });

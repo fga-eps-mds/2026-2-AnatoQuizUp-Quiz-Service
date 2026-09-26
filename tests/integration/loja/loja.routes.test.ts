@@ -111,6 +111,137 @@ describe("Testes de Integração - Loja", () => {
       const body = response.body as { erro: { mensagem: string } };
       expect(body.erro.mensagem).toBe("Saldo de moedas insuficiente para comprar este item.");
     });
+
+    it("deve comprar um consumível várias vezes, somando a quantidade e registrando cada compra", async () => {
+      const item = await prisma.itemLoja.create({
+        data: {
+          codigo: "dica-teste",
+          nome: "Vacina da Dica",
+          tipo: TipoItemLoja.DICA,
+          consumivel: true,
+          efeito: "Revela uma dica para a questão.",
+          precoMoedas: 50,
+        },
+      });
+
+      await prisma.carteiraMoedas.create({
+        data: { usuarioId: "aluno-123", saldo: 300 },
+      });
+
+      const primeira = await request(app)
+        .post("/api/v1/loja/comprar")
+        .send({ itemLojaId: item.id, quantidade: 2 });
+
+      expect(primeira.status).toBe(200);
+      expect(primeira.body).toMatchObject({
+        saldoMoedas: 200,
+        quantidadeComprada: 2,
+        item: { quantidade: 2, item: { consumivel: true } },
+      });
+
+      const segunda = await request(app)
+        .post("/api/v1/loja/comprar")
+        .send({ itemLojaId: item.id });
+
+      expect(segunda.status).toBe(200);
+      expect(segunda.body).toMatchObject({
+        saldoMoedas: 150,
+        quantidadeComprada: 1,
+        item: { quantidade: 3 },
+      });
+
+      const transacoes = await prisma.transacaoMoeda.findMany({
+        where: { usuarioId: "aluno-123", itemLojaId: item.id },
+        orderBy: { criadoEm: "asc" },
+      });
+
+      expect(transacoes.map((t) => [t.quantidade, t.quantidadeItem])).toEqual([
+        [-100, 2],
+        [-50, 1],
+      ]);
+
+      const catalogo = await request(app).get("/api/v1/loja/catalogo");
+      const body = catalogo.body as {
+        dados: Array<{ id: string; adquirido: boolean; quantidadePossuida: number }>;
+      };
+      expect(body.dados.find((dado) => dado.id === item.id)).toMatchObject({
+        adquirido: false,
+        quantidadePossuida: 3,
+      });
+    });
+
+    it("não deve alterar saldo nem inventário quando o total da compra passa do saldo", async () => {
+      const item = await prisma.itemLoja.create({
+        data: {
+          codigo: "tempo-teste",
+          nome: "Tempo Extra",
+          tipo: TipoItemLoja.POTENCIALIZADOR,
+          consumivel: true,
+          precoMoedas: 60,
+        },
+      });
+
+      await prisma.carteiraMoedas.create({
+        data: { usuarioId: "aluno-123", saldo: 100 },
+      });
+
+      await prisma.inventarioItem.create({
+        data: { usuarioId: "aluno-123", itemLojaId: item.id, quantidade: 1 },
+      });
+
+      // 2 x 60 = 120 > 100
+      const response = await request(app)
+        .post("/api/v1/loja/comprar")
+        .send({ itemLojaId: item.id, quantidade: 2 });
+
+      expect(response.status).toBe(422);
+
+      const carteira = await prisma.carteiraMoedas.findUnique({
+        where: { usuarioId: "aluno-123" },
+      });
+      const inventario = await prisma.inventarioItem.findUnique({
+        where: { usuarioId_itemLojaId: { usuarioId: "aluno-123", itemLojaId: item.id } },
+      });
+      const transacoes = await prisma.transacaoMoeda.count({ where: { itemLojaId: item.id } });
+
+      expect(carteira?.saldo).toBe(100);
+      expect(inventario?.quantidade).toBe(1);
+      expect(transacoes).toBe(0);
+    });
+
+    it("deve recusar comprar de novo um cosmético já adquirido, sem debitar", async () => {
+      const item = await prisma.itemLoja.create({
+        data: {
+          codigo: "moldura-teste",
+          nome: "Moldura Teste",
+          tipo: TipoItemLoja.MOLDURA,
+          precoMoedas: 30,
+        },
+      });
+
+      await prisma.carteiraMoedas.create({
+        data: { usuarioId: "aluno-123", saldo: 100 },
+      });
+
+      const primeira = await request(app).post("/api/v1/loja/comprar").send({ itemLojaId: item.id });
+      const segunda = await request(app).post("/api/v1/loja/comprar").send({ itemLojaId: item.id });
+
+      expect(primeira.status).toBe(200);
+      expect(segunda.status).toBe(409);
+
+      const carteira = await prisma.carteiraMoedas.findUnique({
+        where: { usuarioId: "aluno-123" },
+      });
+      expect(carteira?.saldo).toBe(70);
+    });
+
+    it("deve rejeitar quantidade inválida com erro de validação", async () => {
+      const response = await request(app)
+        .post("/api/v1/loja/comprar")
+        .send({ itemLojaId: "qualquer", quantidade: 0 });
+
+      expect(response.status).toBe(400);
+    });
   });
 
   describe("GET /api/v1/loja/meu-inventario", () => {
