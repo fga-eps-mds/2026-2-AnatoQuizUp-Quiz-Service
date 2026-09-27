@@ -185,6 +185,45 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     valor: "linear-gradient(135deg, #0A1128 0%, #00214d 100%)",
   },
 
+  // Itens de aparencia (issue #32): rosto e cabelo, personalizacao do avatar-base.
+  // Um item gratuito de cada tipo garante que a aba nunca fique vazia por padrao.
+  {
+    codigo: "rosto-padrao",
+    nome: "Rosto Padrão",
+    descricao: "Expressão neutra padrão.",
+    tipo: TipoItemLoja.ROSTO,
+    precoMoedas: 0,
+    imagemUrl: avatar("RostoPadrao1", "edb98a"),
+    previewImagemUrl: avatar("RostoPadrao1", "edb98a"),
+  },
+  {
+    codigo: "rosto-sorridente",
+    nome: "Sorridente",
+    descricao: "Rosto com sorriso animado.",
+    tipo: TipoItemLoja.ROSTO,
+    precoMoedas: 150,
+    imagemUrl: avatar("RostoSorridente2", "d08b5b"),
+    previewImagemUrl: avatar("RostoSorridente2", "d08b5b"),
+  },
+  {
+    codigo: "cabelo-padrao",
+    nome: "Cabelo Padrão",
+    descricao: "Corte clássico.",
+    tipo: TipoItemLoja.CABELO,
+    precoMoedas: 0,
+    imagemUrl: avatar("CabeloPadrao1", "ae5d29"),
+    previewImagemUrl: avatar("CabeloPadrao1", "ae5d29"),
+  },
+  {
+    codigo: "cabelo-moicano",
+    nome: "Moicano Colorido",
+    descricao: "Estilo ousado para se destacar.",
+    tipo: TipoItemLoja.CABELO,
+    precoMoedas: 250,
+    imagemUrl: avatar("CabeloMoicano3", "d08b5b"),
+    previewImagemUrl: avatar("CabeloMoicano3", "d08b5b"),
+  },
+
   // Itens consumiveis (issue #35): podem ser comprados varias vezes e acumulam
   // quantidade no inventario. O "codigo" identifica o efeito que a #38 aplica.
   {

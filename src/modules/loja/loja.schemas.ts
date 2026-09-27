@@ -9,6 +9,8 @@ export const VALORES_TIPO_ITEM_LOJA = [
   "AVATAR",
   "TITULO",
   "PLANO_FUNDO",
+  "ROSTO",
+  "CABELO",
   "DICA",
   "POTENCIALIZADOR",
 ] as const;

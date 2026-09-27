@@ -242,6 +242,31 @@ describe("Testes de Integração - Loja", () => {
 
       expect(response.status).toBe(400);
     });
+
+    it("deve comprar um item de ROSTO e refletir adquirido:true no catálogo", async () => {
+      const item = await prisma.itemLoja.create({
+        data: {
+          codigo: "rosto-teste",
+          nome: "Rosto Teste",
+          tipo: TipoItemLoja.ROSTO,
+          precoMoedas: 0,
+          ativo: true,
+          disponivelNaLoja: true,
+        },
+      });
+
+      await prisma.carteiraMoedas.create({
+        data: { usuarioId: "aluno-123", saldo: 0 },
+      });
+
+      const compra = await request(app).post("/api/v1/loja/comprar").send({ itemLojaId: item.id });
+
+      expect(compra.status).toBe(200);
+
+      const catalogo = await request(app).get("/api/v1/loja/catalogo?tipo=ROSTO");
+      const body = catalogo.body as { dados: Array<{ id: string; adquirido: boolean }> };
+      expect(body.dados.find((dado) => dado.id === item.id)).toMatchObject({ adquirido: true });
+    });
   });
 
   describe("GET /api/v1/loja/meu-inventario", () => {
