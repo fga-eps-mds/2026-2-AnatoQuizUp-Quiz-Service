@@ -16,6 +16,7 @@ import { PAPEIS } from "@/shared/constants/papeis";
 import { AlternativaQuestao, Dificuldade, type ResolucaoQuestao } from "@prisma/client";
 import type { ConquistaService } from "@/modules/conquistas/conquistas.service";
 import type { ConquistaDesbloqueadaDto } from "@/modules/conquistas/conquistas.dto";
+import type { UsoItemRepository } from "@/modules/loja/uso-item.repository";
 
 function criarQuestoes(
   ids: string[] = ["id-1", "id-2", "id-3", "id-4"],
@@ -142,6 +143,12 @@ function criarConquistasServiceMock() {
   return {
     processarRespostaQuestao: jest.fn<ConquistaService["processarRespostaQuestao"]>(),
   } as unknown as jest.Mocked<ConquistaService>;
+}
+
+function criarUsoItemRepositoryMock() {
+  return {
+    aplicarCafeNoAcerto: jest.fn<UsoItemRepository["aplicarCafeNoAcerto"]>(),
+  } as unknown as jest.Mocked<UsoItemRepository>;
 }
 
 jest.retryTimes(3);
@@ -292,6 +299,37 @@ describe("Testa Quiz Service", () => {
     expect(resultado.saldoMoedas).toBe(25);
   });
 
+  test("aplica o Cafe do Foco uma vez ao acerto que concede ATP", async () => {
+    const usos = criarUsoItemRepositoryMock();
+    quizService = new QuizService(repository, conquistaService, usos);
+    repository.registrarTentativa.mockResolvedValue(criarTentativa());
+    repository.buscarResposta.mockResolvedValue(criarFeedback());
+    repository.concederMoedasPorAcerto.mockResolvedValue({
+      moedasConcedidas: 25,
+      saldoMoedas: 25,
+      moedasJaConcedidas: false,
+    });
+    repository.buscarSaldoMoedas.mockResolvedValue(50);
+    usos.aplicarCafeNoAcerto.mockResolvedValue({
+      bonusMoedas: 25,
+      saldoMoedas: 50,
+      uso: { itemLoja: { nome: "Café do Foco" } } as never,
+    });
+
+    const resultado = await quizService.responderQuestaoQuiz(
+      criarResponderQuestaoQuizDto(),
+      "usuario-id",
+      PAPEIS.ALUNO,
+    );
+
+    expect(usos.aplicarCafeNoAcerto).toHaveBeenCalledWith("usuario-id", "questa-id", 25);
+    expect(resultado).toMatchObject({
+      moedasConcedidas: 50,
+      saldoMoedas: 50,
+      potencializadorAplicado: { nome: "Café do Foco", bonusMoedas: 25 },
+    });
+  });
+
   test("Testa resposta errada de questão deve retornar boolean false e a resposta correta", async () => {
     repository.registrarTentativa.mockResolvedValue(criarTentativa());
     repository.buscarResposta.mockResolvedValue(criarFeedback(AlternativaQuestao.C));
@@ -344,18 +382,20 @@ describe("Testa Quiz Service", () => {
 
     repository.buscarResposta.mockResolvedValue(criarFeedback(AlternativaQuestao.C));
 
-    const conquistasMock = [{
-      conquistaId: "conquista-1",
-      desbloqueioId: "desbloqueio-1",
-      nome: "Primeiros passos",
-      descricao: "Acerte questões",
-      tier: "BRONZE",
-      tipoConquista: "TOTAL_ACERTOS",
-      temaId: null,
-      moedasConcedidas: 30,
-      saldoMoedas: 30,
-      itemConcedido: null,
-    }];
+    const conquistasMock = [
+      {
+        conquistaId: "conquista-1",
+        desbloqueioId: "desbloqueio-1",
+        nome: "Primeiros passos",
+        descricao: "Acerte questões",
+        tier: "BRONZE",
+        tipoConquista: "TOTAL_ACERTOS",
+        temaId: null,
+        moedasConcedidas: 30,
+        saldoMoedas: 30,
+        itemConcedido: null,
+      },
+    ];
 
     jest
       .spyOn(conquistaService, "processarRespostaQuestao")

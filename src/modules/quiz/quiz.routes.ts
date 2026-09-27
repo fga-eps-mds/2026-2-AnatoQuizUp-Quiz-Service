@@ -13,12 +13,14 @@ import {
 } from "./quiz.schemas";
 import { ConquistaService } from "../conquistas/conquistas.service";
 import { ConquistaRepository } from "../conquistas/conquistas.repository";
+import { UsoItemRepository } from "../loja/uso-item.repository";
 
 // Montagem das dependencias; o quiz depende do service de conquistas para premiar acertos.
 const quizRepository = new QuizRepository();
 const conquistaRepository = new ConquistaRepository();
 const conquistaService = new ConquistaService(conquistaRepository);
-const quizService = new QuizService(quizRepository, conquistaService);
+const usoItemRepository = new UsoItemRepository();
+const quizService = new QuizService(quizRepository, conquistaService, usoItemRepository);
 const quizController = new QuizController(quizService);
 
 const quizRouter = Router();

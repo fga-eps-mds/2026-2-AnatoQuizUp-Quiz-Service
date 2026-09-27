@@ -40,6 +40,7 @@ enum FonteMoeda {
   ACERTO_QUESTAO
   DESBLOQUEIO_CONQUISTA
   COMPRA_ITEM
+  USO_POTENCIALIZADOR
 }
 
 enum StatusResolucaoLista {
@@ -73,6 +74,18 @@ enum TipoItemLoja {
 enum OrigemItemInventario {
   COMPRA
   CONQUISTA
+}
+
+// Efeitos executaveis pelo backend. O campo textual `efeito` continua sendo
+// somente a descricao exibida na interface; esta enumeracao evita que a regra
+// de negocio dependa de comparar textos ou codigos livres do catalogo.
+enum TipoEfeitoItem {
+  DOBRAR_MOEDAS_PROXIMO_ACERTO
+}
+
+enum StatusUsoItem {
+  ATIVO
+  APLICADO
 }
 
 enum TaxonomiaBloom {
@@ -131,6 +144,7 @@ model Questao {
   resolucoes       ResolucaoQuestao[]
   resolucoesListas ResolucaoQuestaoLista[]
   transacoesMoedas TransacaoMoeda[]
+  usosItens        UsoItem[]
 
   listas ListaQuestaoItem[]
 
@@ -216,10 +230,12 @@ model ItemLoja {
   consumivel Boolean @default(false)
   // Texto do efeito exibido na loja (ex.: "+30 segundos na questao").
   efeito     String?
+  tipoEfeito TipoEfeitoItem?
 
   inventarios          InventarioItem[]
   transacoesMoedas     TransacaoMoeda[]
   recompensasConquista RecompensaItemConquista[]
+  usos                 UsoItem[]
 
   criadoEm     DateTime  @default(now())
   atualizadoEm DateTime  @updatedAt
@@ -258,6 +274,31 @@ model InventarioItem {
   @@index([itemLojaId])
   @@index([desbloqueioConquistaId])
   @@map("inventario_itens")
+}
+
+// Cada ativacao de consumivel vira um registro proprio. `chaveUsoPendente` e
+// unica enquanto preenchida: ela impede atomicamente dois cafes ativos para o
+// mesmo usuario/efeito, mas permite manter todos os usos ja aplicados (null).
+model UsoItem {
+  id String @id @default(cuid())
+
+  usuarioId String
+  itemLojaId String
+  tipoEfeito TipoEfeitoItem
+  status     StatusUsoItem @default(ATIVO)
+
+  chaveUsoPendente String? @unique
+  questaoId         String?
+  ativadoEm         DateTime @default(now())
+  aplicadoEm        DateTime?
+
+  itemLoja ItemLoja @relation(fields: [itemLojaId], references: [id], onDelete: Restrict)
+  questao  Questao? @relation(fields: [questaoId], references: [id], onDelete: Restrict)
+
+  @@index([usuarioId, ativadoEm])
+  @@index([usuarioId, status])
+  @@index([questaoId])
+  @@map("usos_itens")
 }
 
 model TransacaoMoeda {

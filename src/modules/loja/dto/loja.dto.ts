@@ -41,3 +41,14 @@ export type CompraItemDto = {
   quantidadeComprada: number;
   item: InventarioItemDto;
 };
+
+export type UsoItemDto = {
+  id: string;
+  itemLojaId: string;
+  itemNome: string;
+  efeito: string;
+  status: "ATIVO" | "APLICADO";
+  ativadoEm: Date;
+  aplicadoEm: Date | null;
+  questaoId: string | null;
+};
