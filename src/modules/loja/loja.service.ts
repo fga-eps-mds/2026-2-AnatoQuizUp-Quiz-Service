@@ -9,7 +9,13 @@ import { MENSAGENS } from "@/shared/constants/mensagens";
 
 import type { InventarioBanco, ItemLojaBanco, LojaRepository } from "./loja.repository";
 import type { UsoItemRepository } from "./uso-item.repository";
-import type { CompraItemDto, InventarioItemDto, ItemLojaDto, UsoItemDto } from "./dto/loja.dto";
+import type {
+  CompraItemDto,
+  InventarioItemDto,
+  ItemLojaDto,
+  RespostaUsoItemDto,
+  UsoItemDto,
+} from "./dto/loja.dto";
 import type { ListarCatalogoQueryDto, ListarInventarioQueryDto } from "./loja.schemas";
 
 // Service da loja: orquestra catalogo, inventario e compra, convertendo os registros
@@ -97,7 +103,7 @@ export class LojaService {
   }
 
   /** Ativa uma unidade do Cafe do Foco para dobrar o proximo acerto elegivel. */
-  async usarItem(usuarioId: string | undefined, itemLojaId: string) {
+  async usarItem(usuarioId: string | undefined, itemLojaId: string): Promise<RespostaUsoItemDto> {
     this.validarUsuarioAutenticado(usuarioId);
 
     if (!this.usoItemRepository) {

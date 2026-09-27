@@ -52,3 +52,9 @@ export type UsoItemDto = {
   aplicadoEm: Date | null;
   questaoId: string | null;
 };
+
+export type RespostaUsoItemDto = {
+  mensagem: string;
+  quantidadeRestante: number;
+  uso: UsoItemDto;
+};
