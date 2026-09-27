@@ -28,7 +28,10 @@ describe('middlewareAutenticacao', () => {
   });
 
   it('deve autenticar com sucesso e inserir o usuario no request', () => {
-    mockRequest.headers = { authorization: 'Bearer token-valido' };
+    mockRequest.headers = {
+      authorization: 'Bearer token-valido',
+      'x-user-id': 'usuario-forjado',
+    };
 
     const payloadMock: PayloadAutenticacao = {
       id: 'usr-1',
@@ -48,6 +51,7 @@ describe('middlewareAutenticacao', () => {
       papel: 'PROFESSOR',
       status: STATUS.ATIVO,
     });
+    expect(mockRequest.usuario?.id).not.toBe('usuario-forjado');
     expect(mockNext).toHaveBeenCalledTimes(1);
   });
 

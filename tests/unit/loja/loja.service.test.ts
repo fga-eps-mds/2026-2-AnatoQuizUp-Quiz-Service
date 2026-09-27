@@ -6,6 +6,7 @@ import type {
   ItemLojaBanco,
   LojaRepository,
 } from "@/modules/loja/loja.repository";
+import type { UsoItemRepository } from "@/modules/loja/uso-item.repository";
 import { ErroAplicacao } from "@/shared/errors/erro-aplicacao";
 
 function criarItemLoja(overrides: Partial<ItemLojaBanco> = {}): ItemLojaBanco {
@@ -238,6 +239,69 @@ describe("Testa Loja Service", () => {
         item: { consumivel: true },
       },
     });
+  });
+
+  test("deve retornar o registro de uso conforme o contrato HTTP existente", async () => {
+    const ativadoEm = new Date("2026-06-16T10:00:00.000Z");
+    const usoItemRepository = {
+      ativarPotencializador: jest.fn().mockResolvedValue({
+        uso: {
+          id: "uso-id",
+          itemLojaId: "cafe-id",
+          status: "ATIVO",
+          ativadoEm,
+          aplicadoEm: null,
+          questaoId: null,
+          itemLoja: { nome: "Cafe do Foco", efeito: "Dobra o proximo acerto." },
+        },
+        quantidadeRestante: 2,
+      }),
+    } as unknown as jest.Mocked<UsoItemRepository>;
+    const serviceComUso = new LojaService(repository, usoItemRepository);
+
+    const resultado = await serviceComUso.usarItem("usuario-id", "cafe-id");
+
+    expect(usoItemRepository.ativarPotencializador).toHaveBeenCalledWith("usuario-id", "cafe-id");
+    expect(resultado).toEqual({
+      mensagem: "Cafe do Foco ativado. Seu proximo acerto valera ATP em dobro.",
+      quantidadeRestante: 2,
+      uso: {
+        id: "uso-id",
+        itemLojaId: "cafe-id",
+        itemNome: "Cafe do Foco",
+        efeito: "Dobra o proximo acerto.",
+        status: "ATIVO",
+        ativadoEm,
+        aplicadoEm: null,
+        questaoId: null,
+      },
+    });
+  });
+
+  test("deve consultar historico somente pelo usuario autenticado e rejeitar usuario ausente", async () => {
+    const usoItemRepository = {
+      listarHistorico: jest.fn().mockResolvedValue({ data: [], total: 0 }),
+    } as unknown as jest.Mocked<UsoItemRepository>;
+    const serviceComHistorico = new LojaService(repository, usoItemRepository);
+    const queryManipulada = { page: 1, limit: 10, usuarioId: "usuario-B" } as never;
+
+    await serviceComHistorico.listarHistoricoUsos("usuario-A", queryManipulada);
+    await serviceComHistorico.listarHistoricoUsos("usuario-B", { page: 1, limit: 10 });
+
+    expect(usoItemRepository.listarHistorico).toHaveBeenNthCalledWith(
+      1,
+      "usuario-A",
+      expect.objectContaining({ page: 1, limit: 10, skip: 0 }),
+    );
+    expect(usoItemRepository.listarHistorico).toHaveBeenNthCalledWith(
+      2,
+      "usuario-B",
+      expect.objectContaining({ page: 1, limit: 10, skip: 0 }),
+    );
+    await expect(serviceComHistorico.listarHistoricoUsos(undefined, {})).rejects.toMatchObject({
+      codigoStatus: 401,
+    });
+    expect(usoItemRepository.listarHistorico).toHaveBeenCalledTimes(2);
   });
 
   test("deve lançar erro ao listar catalogo sem usuario autenticado", async () => {
