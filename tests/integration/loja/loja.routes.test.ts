@@ -1,7 +1,7 @@
 import request from "supertest";
 import type { Request, Response, NextFunction } from "express";
 import express from "express";
-import { TipoItemLoja, OrigemItemInventario } from "@prisma/client";
+import { TipoEfeitoItem, TipoItemLoja, OrigemItemInventario } from "@prisma/client";
 import { prisma } from "@/config/db";
 import { lojaRouter } from "@/modules/loja/loja.routes";
 import { middlewareTratamentoErros } from "@/shared/middlewares/tratamento-erros.middleware";
@@ -10,9 +10,11 @@ interface AuthenticatedRequest extends Request {
   usuario?: { id: string; papel: string };
 }
 
+let mockUsuarioId = "aluno-123";
+
 jest.mock("@/shared/middlewares/papeis.middleware", () => ({
   middlewarePapeis: () => (req: Request, _res: Response, next: NextFunction) => {
-    (req as AuthenticatedRequest).usuario = { id: "aluno-123", papel: "ALUNO" };
+    (req as AuthenticatedRequest).usuario = { id: mockUsuarioId, papel: "ALUNO" };
     next();
   },
 }));
@@ -25,12 +27,14 @@ app.use(middlewareTratamentoErros);
 describe("Testes de Integração - Loja", () => {
   const limparBanco = async () => {
     await prisma.transacaoMoeda.deleteMany();
+    await prisma.usoItem.deleteMany();
     await prisma.inventarioItem.deleteMany();
     await prisma.carteiraMoedas.deleteMany();
     await prisma.itemLoja.deleteMany();
   };
 
   beforeEach(async () => {
+    mockUsuarioId = "aluno-123";
     await limparBanco();
   });
 
@@ -83,8 +87,22 @@ describe("Testes de Integração - Loja", () => {
         .send({ itemLojaId: item.id });
 
       expect(response.status).toBe(200);
-      const body = response.body as { saldoMoedas: number };
-      expect(body.saldoMoedas).toBe(50);
+      expect(response.body).toMatchObject({
+        saldoMoedas: 50,
+        quantidadeComprada: 1,
+        item: {
+          equipado: false,
+          origem: "COMPRA",
+          quantidade: 1,
+          item: { id: item.id, nome: "Skin Premium" },
+        },
+      });
+
+      const inventario = await request(app).get("/api/v1/loja/meu-inventario");
+      expect(inventario.status).toBe(200);
+      expect(inventario.body.dados).toEqual([
+        expect.objectContaining({ item: expect.objectContaining({ id: item.id }) }),
+      ]);
     });
 
     it("deve retornar erro 422 ao comprar item com saldo insuficiente", async () => {
@@ -271,6 +289,56 @@ describe("Testes de Integração - Loja", () => {
       const body = response.body as { dados: Array<{ item: { nome: string } }> };
       expect(body.dados).toHaveLength(1);
       expect(body.dados[0].item.nome).toBe("Moldura Básica");
+    });
+  });
+
+  describe("GET /api/v1/loja/meu-historico-usos", () => {
+    it("isola os registros entre usuários e ignora usuarioId enviado na query", async () => {
+      const item = await prisma.itemLoja.create({
+        data: {
+          codigo: "cafe-historico-teste",
+          nome: "Cafe do Foco",
+          tipo: TipoItemLoja.POTENCIALIZADOR,
+          consumivel: true,
+          tipoEfeito: TipoEfeitoItem.DOBRAR_MOEDAS_PROXIMO_ACERTO,
+          precoMoedas: 20,
+        },
+      });
+
+      const usoA = await prisma.usoItem.create({
+        data: {
+          usuarioId: "aluno-A",
+          itemLojaId: item.id,
+          tipoEfeito: TipoEfeitoItem.DOBRAR_MOEDAS_PROXIMO_ACERTO,
+        },
+      });
+      const usoB = await prisma.usoItem.create({
+        data: {
+          usuarioId: "aluno-B",
+          itemLojaId: item.id,
+          tipoEfeito: TipoEfeitoItem.DOBRAR_MOEDAS_PROXIMO_ACERTO,
+        },
+      });
+
+      mockUsuarioId = "aluno-A";
+      const respostaA = await request(app).get(
+        "/api/v1/loja/meu-historico-usos?usuarioId=aluno-B",
+      );
+
+      expect(respostaA.status).toBe(200);
+      expect(respostaA.body.dados.map((registro: { id: string }) => registro.id)).toEqual([
+        usoA.id,
+      ]);
+      expect(respostaA.body.metadados.total).toBe(1);
+
+      mockUsuarioId = "aluno-B";
+      const respostaB = await request(app).get("/api/v1/loja/meu-historico-usos");
+
+      expect(respostaB.status).toBe(200);
+      expect(respostaB.body.dados.map((registro: { id: string }) => registro.id)).toEqual([
+        usoB.id,
+      ]);
+      expect(respostaB.body.metadados.total).toBe(1);
     });
   });
 });

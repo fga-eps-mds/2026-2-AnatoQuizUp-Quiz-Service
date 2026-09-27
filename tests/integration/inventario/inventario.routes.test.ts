@@ -3,17 +3,14 @@ import type { Request, Response, NextFunction } from "express";
 import express from "express";
 import { TipoItemLoja } from "@prisma/client";
 
-interface AuthenticatedRequest extends Request {
-  usuario?: {
-    id: string;
-    papel: string;
-  };
-}
-
 jest.mock("@/shared/middlewares/papeis.middleware", () => ({
   middlewarePapeis: () => (req: Request, _res: Response, next: NextFunction) => {
-    const authReq = req as AuthenticatedRequest;
-    authReq.usuario = { id: "aluno-teste-123", papel: "ALUNO" };
+    req.usuario = {
+      id: "aluno-teste-123",
+      email: "aluno-teste@example.com",
+      papel: "ALUNO",
+      status: "ATIVO",
+    };
     next();
   },
 }));
@@ -59,6 +56,9 @@ describe("Testes de Integração - Inventário", () => {
       const inv1 = await prisma.inventarioItem.create({ 
         data: { usuarioId: "aluno-teste-123", itemLojaId: item1.id, equipado: true } 
       });
+      const inventarioOutroAluno = await prisma.inventarioItem.create({
+        data: { usuarioId: "aluno-diferente", itemLojaId: item1.id, equipado: true },
+      });
       await prisma.inventarioItem.create({ 
         data: { usuarioId: "aluno-teste-123", itemLojaId: item2.id, equipado: false } 
       });
@@ -70,9 +70,13 @@ describe("Testes de Integração - Inventário", () => {
       expect(response.status).toBe(200);
 
       const item1Atualizado = await prisma.inventarioItem.findUnique({ where: { id: inv1.id } });
+      const itemOutroAlunoAtualizado = await prisma.inventarioItem.findUnique({
+        where: { id: inventarioOutroAluno.id },
+      });
       const item2Atualizado = await prisma.inventarioItem.findFirst({ where: { itemLojaId: item2.id } });
 
       expect(item1Atualizado?.equipado).toBe(false);
+      expect(itemOutroAlunoAtualizado?.equipado).toBe(true);
       expect(item2Atualizado?.equipado).toBe(true);
     });
   });
