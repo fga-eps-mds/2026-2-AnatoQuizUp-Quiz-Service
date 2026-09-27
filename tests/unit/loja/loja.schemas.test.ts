@@ -34,6 +34,8 @@ describe("Testa Loja Schemas", () => {
         "AVATAR",
         "TITULO",
         "PLANO_FUNDO",
+        "ROSTO",
+        "CABELO",
         "DICA",
         "POTENCIALIZADOR",
       ]) {
@@ -43,7 +45,7 @@ describe("Testa Loja Schemas", () => {
 
     test("deve rejeitar tipo invalido", () => {
       const resultado = schemaListarCatalogo.safeParse({
-        tipo: "CABELO",
+        tipo: "ROUPA",
       });
 
       expect(resultado.success).toBe(false);

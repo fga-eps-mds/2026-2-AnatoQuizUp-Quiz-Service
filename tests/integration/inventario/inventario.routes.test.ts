@@ -20,10 +20,12 @@ jest.mock("@/shared/middlewares/papeis.middleware", () => ({
 
 import { prisma } from "@/config/db";
 import { inventarioRoutes } from "@/modules/inventario/inventario.routes";
+import { middlewareTratamentoErros } from "@/shared/middlewares/tratamento-erros.middleware";
 
 const app = express();
 app.use(express.json());
 app.use("/api/v1/inventario", inventarioRoutes);
+app.use(middlewareTratamentoErros);
 
 describe("Testes de Integração - Inventário", () => {
   const limparBanco = async () => {
@@ -74,6 +76,45 @@ describe("Testes de Integração - Inventário", () => {
 
       expect(item1Atualizado?.equipado).toBe(false);
       expect(item2Atualizado?.equipado).toBe(true);
+    });
+
+    it("deve equipar ROSTO e CABELO simultaneamente, por serem slots independentes", async () => {
+      const rosto = await setupItem(TipoItemLoja.ROSTO);
+      const cabelo = await setupItem(TipoItemLoja.CABELO);
+
+      await prisma.inventarioItem.create({
+        data: { usuarioId: "aluno-teste-123", itemLojaId: rosto.id },
+      });
+      await prisma.inventarioItem.create({
+        data: { usuarioId: "aluno-teste-123", itemLojaId: cabelo.id },
+      });
+
+      await request(app).patch("/api/v1/inventario/equipar").send({ itemLojaId: rosto.id });
+      const response = await request(app)
+        .patch("/api/v1/inventario/equipar")
+        .send({ itemLojaId: cabelo.id });
+
+      expect(response.status).toBe(200);
+
+      const rostoAtualizado = await prisma.inventarioItem.findFirst({
+        where: { itemLojaId: rosto.id },
+      });
+      const cabeloAtualizado = await prisma.inventarioItem.findFirst({
+        where: { itemLojaId: cabelo.id },
+      });
+
+      expect(rostoAtualizado?.equipado).toBe(true);
+      expect(cabeloAtualizado?.equipado).toBe(true);
+    });
+
+    it("deve rejeitar equipar item que nao esta no inventario do usuario", async () => {
+      const cabelo = await setupItem(TipoItemLoja.CABELO);
+
+      const response = await request(app)
+        .patch("/api/v1/inventario/equipar")
+        .send({ itemLojaId: cabelo.id });
+
+      expect(response.status).toBe(404);
     });
   });
 
