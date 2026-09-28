@@ -56,6 +56,30 @@ Banco local padrao: `localhost:5433`.
 | `STORAGE_ENABLED` | Habilita o armazenamento de imagens; o padrao e `true` |
 | `MINIO_*` | Configuracao de storage de imagens de questoes |
 
+## Seed de homologacao
+
+O container **nao** executa este seed no startup. Ele executa somente as
+migrations e o seed idempotente do catalogo da loja. O seed de homologacao e
+um reset intencional e manual apenas do banco do Quiz-Service: recria temas,
+questoes, turmas, listas, loja, conquistas e dados de demonstracao; em seguida
+sincroniza o catalogo atual, incluindo consumiveis como o Cafe do Foco.
+
+Antes de executa-lo, informe os IDs reais do professor e do aluno de
+demonstracao, obtidos no Usuario-Service. A confirmacao explicita evita um
+reset acidental:
+
+```bash
+HOMOLOG_SEED_RESET=true \
+HOMOLOG_PROFESSOR_ID='<id-do-professor>' \
+HOMOLOG_ALUNO_ID='<id-do-aluno>' \
+npm run prisma:seed:homologacao
+```
+
+Os IDs opcionais `HOMOLOG_ALUNO_SECUNDARIO_ID` e
+`HOMOLOG_ALUNO_TERCIARIO_ID` servem apenas para popular indicadores do cenario.
+O seed nao cria contas: usuarios, e-mails e senhas continuam sob
+responsabilidade do Usuario-Service.
+
 ## Rotas
 
 Todas as rotas `/api/*` exigem `X-Internal-Token`. Rotas de questoes tambem validam `Authorization: Bearer <accessToken>`.

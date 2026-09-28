@@ -321,7 +321,12 @@ async function salvarItem(item: Prisma.ItemLojaCreateInput) {
   });
 }
 
-async function main() {
+/**
+ * Sincroniza o catalogo atual da loja sem remover inventarios ou transacoes.
+ * Tambem e reutilizado pelo reset manual da homologacao, para que itens
+ * recentes — como o Cafe do Foco — estejam disponiveis imediatamente.
+ */
+export async function sincronizarCatalogo() {
   console.log("Sincronizando catálogo padrão da loja...");
 
   for (const item of itensCatalogo) {
@@ -391,11 +396,13 @@ async function main() {
   console.log(`Catálogo sincronizado: ${itensCatalogo.length} itens públicos e 1 item exclusivo.`);
 }
 
-main()
-  .catch((error) => {
-    console.error("Falha ao sincronizar o catálogo da loja.", error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+export const desconectarCatalogo = () => prisma.$disconnect();
+
+if (require.main === module) {
+  sincronizarCatalogo()
+    .catch((error: unknown) => {
+      console.error("Falha ao sincronizar o catálogo da loja.", error);
+      process.exitCode = 1;
+    })
+    .finally(desconectarCatalogo);
+}

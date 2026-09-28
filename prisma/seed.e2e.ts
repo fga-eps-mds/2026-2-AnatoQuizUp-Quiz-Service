@@ -12,7 +12,32 @@ import {
 
 const prisma = new PrismaClient();
 
-async function main() {
+/**
+ * Identidades externas usadas para relacionar o cenario do Quiz-Service ao
+ * Usuario-Service. O Quiz DB nao possui uma tabela de usuarios propria.
+ */
+export type IdentidadesSeedE2E = {
+  professorId: string;
+  alunoPrincipalId: string;
+  alunoSecundarioId: string;
+  alunoTerciarioId: string;
+};
+
+const IDENTIDADES_PADRAO: IdentidadesSeedE2E = {
+  professorId: "professor-seed",
+  alunoPrincipalId: "aluno-joao",
+  alunoSecundarioId: "cmp7fx99d00044hyqq4msqsyt",
+  alunoTerciarioId: "cmp7fx99d00044hyqq4mswgsr",
+};
+
+/**
+ * Recria o cenario completo usado pelos testes de integracao. Esta funcao e
+ * destrutiva para o banco do Quiz-Service e, por isso, a protecao especifica
+ * da homologacao fica no executor seed-homologacao.ts.
+ */
+export async function executarSeedE2E(
+  identidades: IdentidadesSeedE2E = IDENTIDADES_PADRAO,
+) {
   console.log("Iniciando o seed do Quiz-Service...");
 
   // 1. Limpando as tabelas na ordem correta logo no início para evitar erros de FK
@@ -35,10 +60,10 @@ async function main() {
   await prisma.tema.deleteMany({});
   await prisma.turma.deleteMany({});
 
-  const PROFESSOR_ID = "professor-seed";
-  const ALUNO_1_ID = "cmp7fx99d00044hyqq4msqsyt";
-  const ALUNO_2_ID = "cmp7fx99d00044hyqq4mswgsr";
-  const MEU_USUARIO_ID = "aluno-joao"; // <--- SEU USUARIO
+  const PROFESSOR_ID = identidades.professorId;
+  const ALUNO_1_ID = identidades.alunoSecundarioId;
+  const ALUNO_2_ID = identidades.alunoTerciarioId;
+  const MEU_USUARIO_ID = identidades.alunoPrincipalId;
 
   await prisma.conquista.upsert({
     where: {
@@ -804,12 +829,16 @@ async function main() {
 
 }
 
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+export const desconectarSeedE2E = () => prisma.$disconnect();
+
+// Mantem o comportamento historico de `npm run prisma:seed:e2e` para os testes
+// locais. O executor de homologacao importa a funcao acima e fornece IDs reais.
+if (require.main === module) {
+  executarSeedE2E()
+    .then(desconectarSeedE2E)
+    .catch(async (erro: unknown) => {
+      console.error(erro);
+      await desconectarSeedE2E();
+      process.exit(1);
+    });
+}

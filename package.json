@@ -16,6 +16,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:seed:e2e": "tsx prisma/seed.e2e.ts",
+    "prisma:seed:homologacao": "node dist/prisma/seed-homologacao.js",
     "prisma:seed:catalogo": "tsx prisma/seed-catalogo.ts",
     "prisma:seed:catalogo:prod": "node dist/prisma/seed-catalogo.js",
     "db:up": "docker compose up -d db",
