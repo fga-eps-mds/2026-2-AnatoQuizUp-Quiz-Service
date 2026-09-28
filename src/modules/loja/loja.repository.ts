@@ -101,6 +101,20 @@ export class LojaRepository {
     return { data, total };
   }
 
+  // Compras sao transacoes de moeda; buscar somente essa fonte evita misturar
+  // ganhos de quiz e recompensas no historico da loja.
+  async listarHistoricoCompras(usuarioId: string) {
+    return prisma.transacaoMoeda.findMany({
+      where: {
+        usuarioId,
+        fonte: FonteMoeda.COMPRA_ITEM,
+        itemLojaId: { not: null },
+      },
+      include: { itemLoja: true },
+      orderBy: { criadoEm: "desc" },
+    });
+  }
+
   /**
    * Compra um item da loja de forma atomica e segura contra concorrencia.
    *

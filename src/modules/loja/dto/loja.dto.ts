@@ -58,3 +58,20 @@ export type RespostaUsoItemDto = {
   quantidadeRestante: number;
   uso: UsoItemDto;
 };
+
+// Uma unica linha do historico da loja. Compras e usos compartilham uma data para
+// que o cliente possa exibi-los em uma cronologia unica.
+export type HistoricoLojaDto = {
+  id: string;
+  acao: "COMPRA" | "USO";
+  data: Date;
+  item: {
+    id: string;
+    nome: string;
+  };
+  quantidade: number;
+  custoCompra: number | null;
+  efeitoUso: string | null;
+  statusUso: "ATIVO" | "APLICADO" | null;
+  aplicadoEm: Date | null;
+};

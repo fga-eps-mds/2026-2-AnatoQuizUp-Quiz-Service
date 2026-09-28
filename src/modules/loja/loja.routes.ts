@@ -46,6 +46,13 @@ lojaRouter.post("/comprar", validarRequisicao(schemaComprarItem, "body"), lojaCo
 // POST ativa uma unidade de potencializador do proprio inventario.
 lojaRouter.post("/usar", validarRequisicao(schemaUsarItem, "body"), lojaController.usarItem);
 
+// Cronologia unificada de compras e usos do proprio aluno.
+lojaRouter.get(
+  "/meu-historico",
+  validarRequisicao(schemaListarInventario, "query"),
+  lojaController.listarHistorico,
+);
+
 // GET deixa o registro de uso pronto para a tela de historico da issue #40.
 lojaRouter.get(
   "/meu-historico-usos",

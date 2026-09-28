@@ -51,4 +51,14 @@ describe("UsoItemRepository.listarHistorico", () => {
       { usuarioId: "usuario-B" },
     ]);
   });
+
+  it("busca todos os usos do proprio usuario para a cronologia unificada", async () => {
+    const repository = new UsoItemRepository();
+    await expect(repository.listarHistoricoCompleto("usuario-A")).resolves.toEqual([registros[0]]);
+    expect(findMany).toHaveBeenLastCalledWith({
+      where: { usuarioId: "usuario-A" },
+      include: { itemLoja: true },
+      orderBy: { ativadoEm: "desc" },
+    });
+  });
 });

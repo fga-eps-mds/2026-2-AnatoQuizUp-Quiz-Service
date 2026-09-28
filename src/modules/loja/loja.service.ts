@@ -11,6 +11,7 @@ import type { InventarioBanco, ItemLojaBanco, LojaRepository } from "./loja.repo
 import type { UsoItemRepository } from "./uso-item.repository";
 import type {
   CompraItemDto,
+  HistoricoLojaDto,
   InventarioItemDto,
   ItemLojaDto,
   RespostaUsoItemDto,
@@ -145,6 +146,64 @@ export class LojaService {
     return {
       dados: data.map((uso) => this.converterUso(uso)),
       metadados: montarMetadadosPaginacao(paginacao, total),
+    };
+  }
+
+  /**
+   * Combina as transacoes de compra e as ativacoes de potencializador em uma
+   * cronologia do usuario autenticado. A paginacao ocorre apos a ordenacao para
+   * que uma pagina nunca omita um tipo de evento em favor do outro.
+   */
+  async listarHistorico(
+    usuarioId: string | undefined,
+    query: ListarInventarioQueryDto,
+  ): Promise<RespostaPaginada<HistoricoLojaDto>> {
+    this.validarUsuarioAutenticado(usuarioId);
+    if (!this.usoItemRepository) {
+      throw new ErroAplicacao({
+        codigoStatus: 500,
+        codigo: CodigoDeErro.ERRO_INTERNO,
+        mensagem: MENSAGENS.erroInterno,
+      });
+    }
+
+    const [compras, usos] = await Promise.all([
+      this.lojaRepository.listarHistoricoCompras(usuarioId),
+      this.usoItemRepository.listarHistoricoCompleto(usuarioId),
+    ]);
+    const eventos: HistoricoLojaDto[] = [
+      ...compras.flatMap((compra) =>
+        compra.itemLoja
+          ? [{
+              id: compra.id,
+              acao: "COMPRA" as const,
+              data: compra.criadoEm,
+              item: { id: compra.itemLoja.id, nome: compra.itemLoja.nome },
+              quantidade: compra.quantidadeItem ?? 1,
+              custoCompra: Math.abs(compra.quantidade),
+              efeitoUso: null,
+              statusUso: null,
+              aplicadoEm: null,
+            }]
+          : [],
+      ),
+      ...usos.map((uso) => ({
+        id: uso.id,
+        acao: "USO" as const,
+        data: uso.ativadoEm,
+        item: { id: uso.itemLoja.id, nome: uso.itemLoja.nome },
+        quantidade: 1,
+        custoCompra: null,
+        efeitoUso: uso.itemLoja.efeito ?? "Potencializador ativado.",
+        statusUso: uso.status as "ATIVO" | "APLICADO",
+        aplicadoEm: uso.aplicadoEm,
+      })),
+    ].sort((a, b) => b.data.getTime() - a.data.getTime());
+    const paginacao = resolverParametrosPaginacao(query);
+
+    return {
+      dados: eventos.slice(paginacao.skip, paginacao.skip + paginacao.limit),
+      metadados: montarMetadadosPaginacao(paginacao, eventos.length),
     };
   }
 
