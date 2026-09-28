@@ -41,6 +41,9 @@ export async function executarSeedE2E(
   console.log("Iniciando o seed do Quiz-Service...");
 
   // 1. Limpando as tabelas na ordem correta logo no início para evitar erros de FK
+  // UsoItem referencia tanto itens quanto questoes; deve ser removido antes dos
+  // dois para permitir reconstruir o cenario apos ativacoes de consumiveis.
+  await prisma.usoItem.deleteMany({});
   await prisma.transacaoMoeda.deleteMany({});
   await prisma.inventarioItem.deleteMany({});
   await prisma.recompensaItemConquista.deleteMany({});
