@@ -191,12 +191,12 @@ jobs:
 
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-          PROJECT_KEY: fga-eps-mds_2026-1-AnatoQuizUp-Quiz-Service
+          PROJECT_KEY: fga-eps-mds_2026-2-AnatoQuizUp-Quiz-Service
 
         run: |
 
-          # Nome: fga-eps-mds-2026_1_UNB-AnatoQuizUp-Quiz-Service-MM-DD-YYYY-HH-MM-SS-vX.Y.Z.json
-          SEMESTER="2026_1"
+          # Nome: fga-eps-mds-2026_2_UNB-AnatoQuizUp-Quiz-Service-MM-DD-YYYY-HH-MM-SS-vX.Y.Z.json
+          SEMESTER="2026_2"
 
           PROJECT_NAME="AnatoQuizUp"
 
@@ -268,7 +268,7 @@ jobs:
 
           fi
 
-          git clone --depth 1 https://x-access-token:$DOC_PUSH_TOKEN@github.com/fga-eps-mds/2026-1-AnatoQuizUp-Doc.git doc-repo
+          git clone --depth 1 https://x-access-token:$DOC_PUSH_TOKEN@github.com/fga-eps-mds/2026-2-AnatoQuizUp-Doc.git doc-repo
 
           cd doc-repo
 

@@ -89,9 +89,9 @@ jobs:
       - name: Exportar metrics.json
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          PROJECT_KEY: fga-eps-mds_2026-1-AnatoQuizUp-Quiz-Service
+          PROJECT_KEY: fga-eps-mds_2026-2-AnatoQuizUp-Quiz-Service
         run: |
-          SEMESTER="2026_1"
+          SEMESTER="2026_2"
           PROJECT_NAME="AnatoQuizUp"
           REPO_NAME="Quiz-Service"
           DATE_HORA=$(date -u +"%m-%d-%Y-%H-%M-%S")
@@ -128,7 +128,7 @@ jobs:
             echo "::warning::Secret DOC_PUSH_TOKEN nao configurada, pulando commit no repo de doc."
             exit 0
           fi
-          git clone --depth 1 https://x-access-token:$DOC_PUSH_TOKEN@github.com/fga-eps-mds/2026-1-AnatoQuizUp-Doc.git doc-repo
+          git clone --depth 1 https://x-access-token:$DOC_PUSH_TOKEN@github.com/fga-eps-mds/2026-2-AnatoQuizUp-Doc.git doc-repo
           cd doc-repo
           mkdir -p analytics-raw-data/quiz-service
           cp "../${{ env.METRICS_FILE }}" "analytics-raw-data/quiz-service/${{ env.METRICS_FILE }}"
