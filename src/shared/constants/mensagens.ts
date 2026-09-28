@@ -30,6 +30,9 @@ export const MENSAGENS = {
 
   questaoGabaritoObrigatorio: "A questao deve possuir gabarito definido.",
 
+  uploadImagemIndisponivel:
+    "O envio de imagens esta temporariamente indisponivel neste ambiente.",
+
   // Mensagens de usuario, cadastro e administracao.
   usuarioNaoEncontrado: "Usuario nao encontrado.",
 

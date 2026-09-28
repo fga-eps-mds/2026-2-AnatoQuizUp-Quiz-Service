@@ -1,6 +1,8 @@
 import { S3Client } from "@aws-sdk/client-s3";
 import * as Minio from "minio";
 
+import { env } from "@/config/env";
+
 // Configuracao de storage (MinIO/S3) para imagens das questoes.
 
 // Clientes guardados no global para reuso entre hot-reloads (mesma logica do Prisma).
@@ -8,19 +10,6 @@ declare global {
   var __minio_native__: Minio.Client | undefined;
   var __s3_client__: S3Client | undefined;
 }
-
-// Credenciais e endpoint do MinIO vindos do ambiente.
-const rawEndpoint = process.env.MINIO_ENDPOINT;
-const accessKey = process.env.MINIO_ROOT_USER;
-const secretKey = process.env.MINIO_ROOT_PASSWORD;
-const apiPort = process.env.MINIO_API_PORT;
-
-// Sem configuracao de storage o servico nao sobe (falha cedo).
-if (!rawEndpoint || !accessKey || !secretKey || !apiPort) {
-  throw new Error("Erro: Variáveis do MinIO não configuradas.");
-}
-
-const isProduction = process.env.NODE_ENV === "production";
 
 // Normaliza endpoint+porta em hostname/porta/SSL e a URL S3 sem barra final.
 export function montarEndpointStorage(endpoint: string, portaApi: string) {
@@ -48,43 +37,58 @@ export function montarEndpointStorage(endpoint: string, portaApi: string) {
   };
 }
 
-export const minioEndpointConfig = montarEndpointStorage(rawEndpoint, apiPort);
+function criarClientesStorage() {
+  const rawEndpoint = env.MINIO_ENDPOINT;
+  const accessKey = env.MINIO_ROOT_USER;
+  const secretKey = env.MINIO_ROOT_PASSWORD;
+  const apiPort = env.MINIO_API_PORT;
 
-// Cliente nativo do MinIO, usado para administracao (buckets, policies).
-export const minioAdmin =
-  global.__minio_native__ ??
-  new Minio.Client({
-    endPoint: minioEndpointConfig.hostname,
-    port: minioEndpointConfig.port,
-    useSSL: minioEndpointConfig.useSSL,
-    accessKey,
-    secretKey,
-  });
+  if (!rawEndpoint || !accessKey || !secretKey || !apiPort) {
+    throw new Error("Erro: Variáveis do MinIO não configuradas.");
+  }
 
-// Cliente S3 (AWS SDK) apontando para o MinIO, usado para upload/download de objetos.
-export const s3Client =
-  global.__s3_client__ ??
-  new S3Client({
-    endpoint: minioEndpointConfig.s3Endpoint,
-    region: "us-east-1",
-    credentials: {
-      accessKeyId: accessKey,
-      secretAccessKey: secretKey,
-    },
-    forcePathStyle: true,
-  });
+  const minioEndpointConfig = montarEndpointStorage(rawEndpoint, apiPort);
+  const minioAdmin =
+    global.__minio_native__ ??
+    new Minio.Client({
+      endPoint: minioEndpointConfig.hostname,
+      port: minioEndpointConfig.port,
+      useSSL: minioEndpointConfig.useSSL,
+      accessKey,
+      secretKey,
+    });
 
-// Guarda os clientes no global fora de producao para reuso no hot-reload.
-if (!isProduction) {
-  global.__minio_native__ = minioAdmin;
-  global.__s3_client__ = s3Client;
+  const s3Client =
+    global.__s3_client__ ??
+    new S3Client({
+      endpoint: minioEndpointConfig.s3Endpoint,
+      region: "us-east-1",
+      credentials: {
+        accessKeyId: accessKey,
+        secretAccessKey: secretKey,
+      },
+      forcePathStyle: true,
+    });
+
+  if (env.NODE_ENV !== "production") {
+    global.__minio_native__ = minioAdmin;
+    global.__s3_client__ = s3Client;
+  }
+
+  return { minioAdmin, s3Client };
 }
 
 // Garante a infraestrutura de storage no boot: cria o bucket publico se faltar.
 export async function configurarStorage() {
+  if (!env.STORAGE_ENABLED) {
+    console.log("[Storage] Desabilitado neste ambiente.");
+    return;
+  }
+
   const bucketName = "anatoquizup-imagens";
 
   try {
+    const { minioAdmin } = criarClientesStorage();
     const existe = await minioAdmin.bucketExists(bucketName);
 
     if (!existe) {

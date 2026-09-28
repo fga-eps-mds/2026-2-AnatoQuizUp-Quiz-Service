@@ -33,7 +33,7 @@ import { eventEmitter } from "@/shared/events/event-emitter";
 export class QuestionService {
   constructor(
     private readonly questionRepository: QuestionRepository,
-    private readonly minioService: MinioService,
+    private readonly minioService?: MinioService,
   ) {}
 
   // Lista paginada de questoes, ja convertidas para o DTO de resposta.
@@ -103,7 +103,7 @@ export class QuestionService {
     let urlImagemMinio: string | undefined = undefined;
 
     if (arquivoImagem) {
-      urlImagemMinio = await this.minioService.uploadImagem(arquivoImagem);
+      urlImagemMinio = await this.enviarImagem(arquivoImagem);
     }
 
     const dadosParaSalvar = {
@@ -149,7 +149,7 @@ export class QuestionService {
     let urlImagemFinal = questaoAntiga.urlImagem ?? "";
 
     if (arquivoImagem) {
-      urlImagemFinal = await this.minioService.uploadImagem(arquivoImagem);
+      urlImagemFinal = await this.enviarImagem(arquivoImagem);
     }
 
     // Merge: usa o valor enviado ou, na ausencia, o valor atual da questao.
@@ -186,6 +186,18 @@ export class QuestionService {
     const questaoRemovida = await this.questionRepository.desativar(id);
 
     return converterParaRespostaQuestao(questaoRemovida);
+  }
+
+  private async enviarImagem(arquivoImagem: Express.Multer.File): Promise<string> {
+    if (!this.minioService) {
+      throw new ErroAplicacao({
+        codigoStatus: 503,
+        codigo: CodigoDeErro.SERVICO_INDISPONIVEL,
+        mensagem: MENSAGENS.uploadImagemIndisponivel,
+      });
+    }
+
+    return this.minioService.uploadImagem(arquivoImagem);
   }
 
   /**

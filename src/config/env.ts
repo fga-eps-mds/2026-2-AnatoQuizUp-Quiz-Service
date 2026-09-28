@@ -28,6 +28,10 @@ const envSchema = z.object({
   JWT_SECRET_KEY: variavelComDefaultDeTeste("JWT_SECRET_KEY", "test-secret"),
   INTERNAL_TOKEN: variavelComDefaultDeTeste("INTERNAL_TOKEN", "test-internal-token"),
   CORS_ORIGINS: z.string().default(DEFAULT_CORS_ORIGINS).transform(parseCorsOrigins),
+  STORAGE_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((valor) => valor === "true"),
   MINIO_ROOT_USER: z.string().optional(),
   MINIO_ROOT_PASSWORD: z.string().optional(),
   MINIO_ENDPOINT: z.string().optional(),
