@@ -53,6 +53,7 @@ Banco local padrao: `localhost:5433`.
 | `DATABASE_URL` | URL do Quiz DB |
 | `JWT_SECRET_KEY` | Mesmo segredo usado pelo Backend/Auth para assinar access tokens |
 | `INTERNAL_TOKEN` | Mesmo segredo configurado no BFF e Backend/Auth |
+| `STORAGE_ENABLED` | Habilita o armazenamento de imagens; o padrao e `true` |
 | `MINIO_*` | Configuracao de storage de imagens de questoes |
 
 ## Rotas
@@ -76,4 +77,3 @@ make lint
 make test
 make build
 ```
-

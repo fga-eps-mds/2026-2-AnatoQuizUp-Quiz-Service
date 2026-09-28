@@ -6,6 +6,7 @@ import type {
   RegistroQuestaoCompleta,
 } from "../../../src/modules/questoes/dto/question.types";
 import { MENSAGENS } from "@/shared/constants/mensagens";
+import { CodigoDeErro } from "@/shared/errors/codigos-de-erro";
 
 function criarQuestao(overrides: Partial<RegistroQuestaoCompleta> = {}): RegistroQuestaoCompleta {
   const agora = new Date("2026-05-09T12:00:00.000Z");
@@ -137,6 +138,19 @@ describe("QuestionService", () => {
       const result = await service.criar(input, imagemMock, "prof-1");
       expect(minioService.uploadImagem).toHaveBeenCalled();
       expect(result.imagem).toBe("url-minio");
+    });
+
+    test("criar deve recusar imagem quando o armazenamento estiver desabilitado", async () => {
+      const serviceSemArmazenamento = new QuestionService(repository);
+
+      await expect(
+        serviceSemArmazenamento.criar(criarInputValido(), imagemMock, "prof-1"),
+      ).rejects.toMatchObject({
+        codigoStatus: 503,
+        codigo: CodigoDeErro.SERVICO_INDISPONIVEL,
+        message: MENSAGENS.uploadImagemIndisponivel,
+      });
+      expect(minioService.uploadImagem).not.toHaveBeenCalled();
     });
 
     test("criar deve usar imagem do DTO se arquivo for nulo", async () => {

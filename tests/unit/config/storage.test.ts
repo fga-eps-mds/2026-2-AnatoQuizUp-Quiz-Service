@@ -57,19 +57,21 @@ describe("Storage Configuration", () => {
     expect(minioAdmin.setBucketPolicy).toHaveBeenCalled();
   });
 
-  it("usa a porta de API mesmo quando endpoint vier com porta de console", async () => {
-    const { montarEndpointStorage } = await carregarStorage({
-      NODE_ENV: "production",
-      MINIO_ENDPOINT: "https://minio.example.com:9001",
-      MINIO_API_PORT: "9000",
-    });
+  it("nao inicializa o MinIO quando o storage esta desabilitado", async () => {
+    const minioAdmin = criarMinioMock();
+    const { configurarStorage } = await carregarStorage(
+      {
+        STORAGE_ENABLED: "false",
+        MINIO_ENDPOINT: undefined,
+        MINIO_API_PORT: undefined,
+        MINIO_ROOT_USER: undefined,
+        MINIO_ROOT_PASSWORD: undefined,
+      },
+      minioAdmin,
+    );
 
-    expect(montarEndpointStorage("https://minio.example.com:9001", "9000")).toEqual({
-      hostname: "minio.example.com",
-      port: 9000,
-      useSSL: true,
-      s3Endpoint: "https://minio.example.com:9000",
-    });
+    await expect(configurarStorage()).resolves.toBeUndefined();
+    expect(minioAdmin.bucketExists).not.toHaveBeenCalled();
   });
 
   it("usa a porta de API mesmo quando endpoint vier com porta de console", async () => {
@@ -87,8 +89,25 @@ describe("Storage Configuration", () => {
     });
   });
 
-  it("lanca erro instantaneo quando as variaveis do MinIO estao ausentes", async () => {
-    await expect(carregarStorage({ MINIO_ENDPOINT: undefined })).rejects.toThrow(
+  it("usa a porta de API mesmo quando endpoint vier com porta de console", async () => {
+    const { montarEndpointStorage } = await carregarStorage({
+      NODE_ENV: "production",
+      MINIO_ENDPOINT: "https://minio.example.com:9001",
+      MINIO_API_PORT: "9000",
+    });
+
+    expect(montarEndpointStorage("https://minio.example.com:9001", "9000")).toEqual({
+      hostname: "minio.example.com",
+      port: 9000,
+      useSSL: true,
+      s3Endpoint: "https://minio.example.com:9000",
+    });
+  });
+
+  it("lanca erro quando o storage habilitado nao possui as variaveis do MinIO", async () => {
+    const { configurarStorage } = await carregarStorage({ MINIO_ENDPOINT: undefined });
+
+    await expect(configurarStorage()).rejects.toThrow(
       "Erro: Variáveis do MinIO não configuradas.",
     );
   });

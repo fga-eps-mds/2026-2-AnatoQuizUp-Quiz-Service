@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 
+import { env } from "@/config/env";
 import { PAPEIS } from "@/shared/constants/papeis";
 import { middlewarePapeis } from "@/shared/middlewares/papeis.middleware";
 import { validarRequisicao } from "@/shared/middlewares/validacao.middleware";
@@ -24,7 +25,7 @@ import {
 
 const questionRepository = new QuestionRepository();
 
-const minioService = new MinioService();
+const minioService = env.STORAGE_ENABLED ? new MinioService() : undefined;
 
 const questionService = new QuestionService(questionRepository, minioService);
 
