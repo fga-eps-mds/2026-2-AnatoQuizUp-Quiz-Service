@@ -110,4 +110,17 @@ export class LojaController {
       return next(error);
     }
   };
+
+  listarHistorico = async (
+    request: Request<unknown, unknown, unknown, ListarInventarioQueryDto>,
+    response: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const historico = await this.lojaService.listarHistorico(request.usuario?.id, request.query);
+      return response.status(200).json(historico);
+    } catch (error) {
+      return next(error);
+    }
+  };
 }

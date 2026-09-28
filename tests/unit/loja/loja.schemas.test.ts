@@ -2,6 +2,7 @@ import {
   schemaComprarItem,
   schemaListarCatalogo,
   schemaListarInventario,
+  schemaUsarItem,
 } from "@/modules/loja/loja.schemas";
 
 describe("Testa Loja Schemas", () => {
@@ -89,6 +90,15 @@ describe("Testa Loja Schemas", () => {
       }
     });
 
+    test("nao aceita usuarioId arbitrario como filtro da consulta", () => {
+      const resultado = schemaListarInventario.safeParse({
+        page: "1",
+        usuarioId: "outro-usuario",
+      });
+
+      expect(resultado).toEqual({ success: true, data: { page: 1 } });
+    });
+
     test("deve rejeitar limit decimal", () => {
       const resultado = schemaListarInventario.safeParse({
         limit: 10.5,
@@ -145,6 +155,19 @@ describe("Testa Loja Schemas", () => {
       });
 
       expect(resultado.success).toBe(false);
+    });
+  });
+
+  describe("schemaUsarItem", () => {
+    test("deve validar uso com itemLojaId", () => {
+      expect(schemaUsarItem.safeParse({ itemLojaId: " cafe-id " })).toEqual({
+        success: true,
+        data: { itemLojaId: "cafe-id" },
+      });
+    });
+
+    test("deve rejeitar uso sem itemLojaId", () => {
+      expect(schemaUsarItem.safeParse({})).toMatchObject({ success: false });
     });
   });
 });

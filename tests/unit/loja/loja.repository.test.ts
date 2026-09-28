@@ -29,6 +29,7 @@ jest.mock("@/config/db", () => ({
 
     transacaoMoeda: {
       create: jest.fn(),
+      findMany: jest.fn(),
     },
   },
 }));
@@ -150,6 +151,22 @@ describe("Testa Loja Repository", () => {
       data: registros,
       total: totalRegistros,
       quantidadesPossuidas: new Map([[item.id, 1]]),
+    });
+  });
+
+  test("lista apenas compras do usuario para compor o historico da loja", async () => {
+    const compras = [{ id: "compra-1" }];
+    (prisma.transacaoMoeda.findMany as jest.Mock).mockResolvedValue(compras);
+
+    await expect(repository.listarHistoricoCompras("usuario-id")).resolves.toBe(compras);
+    expect(prisma.transacaoMoeda.findMany).toHaveBeenCalledWith({
+      where: {
+        usuarioId: "usuario-id",
+        fonte: FonteMoeda.COMPRA_ITEM,
+        itemLojaId: { not: null },
+      },
+      include: { itemLoja: true },
+      orderBy: { criadoEm: "desc" },
     });
   });
 

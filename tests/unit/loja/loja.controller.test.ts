@@ -24,6 +24,7 @@ describe("Testa Loja Controller", () => {
       listarCatalogo: jest.fn(),
       listarInventario: jest.fn(),
       comprar: jest.fn(),
+      listarHistorico: jest.fn(),
     } as unknown as jest.Mocked<LojaService>;
 
     controller = new LojaController(lojaService);
@@ -94,6 +95,19 @@ describe("Testa Loja Controller", () => {
     await controller.listarCatalogo(request, response, nextMock);
 
     expect(nextMock).toHaveBeenCalledWith(erro);
+  });
+
+  test("deve listar a cronologia unificada do usuario autenticado", async () => {
+    const respostaMock = { dados: [], metadados: { page: 1, limit: 10, total: 0, totalPages: 0 } };
+    lojaService.listarHistorico.mockResolvedValue(respostaMock);
+    const request = { usuario: { id: "usuario-id" }, query: { page: 1, limit: 10 } } as unknown as Request;
+    const { response, status, json } = criarResponseMock();
+
+    await controller.listarHistorico(request, response, next);
+
+    expect(lojaService.listarHistorico).toHaveBeenCalledWith("usuario-id", request.query);
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json).toHaveBeenCalledWith(respostaMock);
   });
 
   test("deve listar inventario com sucesso", async () => {

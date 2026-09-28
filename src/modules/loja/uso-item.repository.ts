@@ -172,4 +172,13 @@ export class UsoItemRepository {
 
     return { data, total };
   }
+
+  // A cronologia unificada aplica a paginacao depois de combinar compras e usos.
+  async listarHistoricoCompleto(usuarioId: string) {
+    return prisma.usoItem.findMany({
+      where: { usuarioId },
+      include: { itemLoja: true },
+      orderBy: { ativadoEm: "desc" },
+    });
+  }
 }

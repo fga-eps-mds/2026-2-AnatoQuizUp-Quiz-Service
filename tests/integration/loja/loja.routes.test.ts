@@ -1,18 +1,31 @@
 import request from "supertest";
 import type { Request, Response, NextFunction } from "express";
 import express from "express";
-import { TipoItemLoja, OrigemItemInventario } from "@prisma/client";
+import {
+  AlternativaQuestao,
+  Dificuldade,
+  FonteMoeda,
+  StatusQuestao,
+  TipoEfeitoItem,
+  TipoItemLoja,
+  TipoQuestao,
+  OrigemItemInventario,
+} from "@prisma/client";
 import { prisma } from "@/config/db";
 import { lojaRouter } from "@/modules/loja/loja.routes";
+import { quizRouter } from "@/modules/quiz/quiz.routes";
+import { TIPO_QUESTAO_API } from "@/modules/questoes/dto/question.types";
 import { middlewareTratamentoErros } from "@/shared/middlewares/tratamento-erros.middleware";
 
 interface AuthenticatedRequest extends Request {
   usuario?: { id: string; papel: string };
 }
 
+let mockUsuarioId = "aluno-123";
+
 jest.mock("@/shared/middlewares/papeis.middleware", () => ({
   middlewarePapeis: () => (req: Request, _res: Response, next: NextFunction) => {
-    (req as AuthenticatedRequest).usuario = { id: "aluno-123", papel: "ALUNO" };
+    (req as AuthenticatedRequest).usuario = { id: mockUsuarioId, papel: "ALUNO" };
     next();
   },
 }));
@@ -20,17 +33,20 @@ jest.mock("@/shared/middlewares/papeis.middleware", () => ({
 const app = express();
 app.use(express.json());
 app.use("/api/v1/loja", lojaRouter);
+app.use("/api/v1/quiz", quizRouter);
 app.use(middlewareTratamentoErros);
 
 describe("Testes de Integração - Loja", () => {
   const limparBanco = async () => {
     await prisma.transacaoMoeda.deleteMany();
+    await prisma.usoItem.deleteMany();
     await prisma.inventarioItem.deleteMany();
     await prisma.carteiraMoedas.deleteMany();
     await prisma.itemLoja.deleteMany();
   };
 
   beforeEach(async () => {
+    mockUsuarioId = "aluno-123";
     await limparBanco();
   });
 
@@ -83,8 +99,22 @@ describe("Testes de Integração - Loja", () => {
         .send({ itemLojaId: item.id });
 
       expect(response.status).toBe(200);
-      const body = response.body as { saldoMoedas: number };
-      expect(body.saldoMoedas).toBe(50);
+      expect(response.body).toMatchObject({
+        saldoMoedas: 50,
+        quantidadeComprada: 1,
+        item: {
+          equipado: false,
+          origem: "COMPRA",
+          quantidade: 1,
+          item: { id: item.id, nome: "Skin Premium" },
+        },
+      });
+
+      const inventario = await request(app).get("/api/v1/loja/meu-inventario");
+      expect(inventario.status).toBe(200);
+      expect(inventario.body.dados).toEqual([
+        expect.objectContaining({ item: expect.objectContaining({ id: item.id }) }),
+      ]);
     });
 
     it("deve retornar erro 422 ao comprar item com saldo insuficiente", async () => {
@@ -296,6 +326,117 @@ describe("Testes de Integração - Loja", () => {
       const body = response.body as { dados: Array<{ item: { nome: string } }> };
       expect(body.dados).toHaveLength(1);
       expect(body.dados[0].item.nome).toBe("Moldura Básica");
+    });
+  });
+
+  describe("GET /api/v1/loja/meu-historico", () => {
+    it("cobre compra, uso, consumo no quiz e consulta da cronologia", async () => {
+      const cafe = await prisma.itemLoja.create({
+        data: {
+          codigo: "cafe-fluxo-completo",
+          nome: "Cafe do Foco",
+          tipo: TipoItemLoja.POTENCIALIZADOR,
+          consumivel: true,
+          tipoEfeito: TipoEfeitoItem.DOBRAR_MOEDAS_PROXIMO_ACERTO,
+          efeito: "Dobra o proximo acerto.",
+          precoMoedas: 20,
+        },
+      });
+      await prisma.carteiraMoedas.create({ data: { usuarioId: "aluno-123", saldo: 100 } });
+      const tema = await prisma.tema.create({ data: { nome: "Anatomia - fluxo loja" } });
+      const questao = await prisma.questao.create({
+        data: {
+          enunciado: "Qual alternativa esta correta?",
+          tipoQuestao: TipoQuestao.MULTIPLA_ESCOLHA,
+          respostaCorreta: AlternativaQuestao.A,
+          dificuldade: Dificuldade.FACIL,
+          temaId: tema.id,
+          criadoPorId: "prof-123",
+          status: StatusQuestao.ATIVO,
+        },
+      });
+
+      await expect(request(app).post("/api/v1/loja/comprar").send({ itemLojaId: cafe.id })).resolves.toMatchObject({ status: 200 });
+      await expect(request(app).post("/api/v1/loja/usar").send({ itemLojaId: cafe.id })).resolves.toMatchObject({ status: 200 });
+      const respostaQuiz = await request(app).post("/api/v1/quiz/responder").send({
+        questaoId: questao.id,
+        tipo: TIPO_QUESTAO_API.MULTIPLA_ESCOLHA,
+        respostaMarcada: AlternativaQuestao.A,
+      });
+
+      expect(respostaQuiz.status).toBe(200);
+      expect(respostaQuiz.body.potencializadorAplicado).toMatchObject({ nome: "Cafe do Foco" });
+      const historico = await request(app).get("/api/v1/loja/meu-historico");
+      expect(historico.status).toBe(200);
+      expect(historico.body.dados).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ acao: "COMPRA", item: { id: cafe.id, nome: "Cafe do Foco" }, custoCompra: 20 }),
+          expect.objectContaining({ acao: "USO", item: { id: cafe.id, nome: "Cafe do Foco" }, statusUso: "APLICADO", efeitoUso: "Dobra o proximo acerto." }),
+        ]),
+      );
+    });
+
+    it("unifica compras e usos, mantendo os dados isolados por usuário", async () => {
+      const item = await prisma.itemLoja.create({
+        data: {
+          codigo: "cafe-historico-teste",
+          nome: "Cafe do Foco",
+          tipo: TipoItemLoja.POTENCIALIZADOR,
+          consumivel: true,
+          tipoEfeito: TipoEfeitoItem.DOBRAR_MOEDAS_PROXIMO_ACERTO,
+          precoMoedas: 20,
+        },
+      });
+
+      const usoA = await prisma.usoItem.create({
+        data: {
+          usuarioId: "aluno-A",
+          itemLojaId: item.id,
+          tipoEfeito: TipoEfeitoItem.DOBRAR_MOEDAS_PROXIMO_ACERTO,
+        },
+      });
+      const usoB = await prisma.usoItem.create({
+        data: {
+          usuarioId: "aluno-B",
+          itemLojaId: item.id,
+          tipoEfeito: TipoEfeitoItem.DOBRAR_MOEDAS_PROXIMO_ACERTO,
+        },
+      });
+      await prisma.carteiraMoedas.createMany({
+        data: [{ usuarioId: "aluno-A", saldo: 0 }, { usuarioId: "aluno-B", saldo: 0 }],
+      });
+      const compraA = await prisma.transacaoMoeda.create({
+        data: {
+          usuarioId: "aluno-A",
+          itemLojaId: item.id,
+          quantidade: -20,
+          quantidadeItem: 1,
+          fonte: FonteMoeda.COMPRA_ITEM,
+        },
+      });
+
+      mockUsuarioId = "aluno-A";
+      const respostaA = await request(app).get(
+        "/api/v1/loja/meu-historico?usuarioId=aluno-B",
+      );
+
+      expect(respostaA.status).toBe(200);
+      expect(respostaA.body.dados).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: compraA.id, acao: "COMPRA", custoCompra: 20, item: { id: item.id, nome: "Cafe do Foco" } }),
+          expect.objectContaining({ id: usoA.id, acao: "USO", efeitoUso: expect.any(String) }),
+        ]),
+      );
+      expect(respostaA.body.metadados.total).toBe(2);
+
+      mockUsuarioId = "aluno-B";
+      const respostaB = await request(app).get("/api/v1/loja/meu-historico");
+
+      expect(respostaB.status).toBe(200);
+      expect(respostaB.body.dados.map((registro: { id: string }) => registro.id)).toEqual([
+        usoB.id,
+      ]);
+      expect(respostaB.body.metadados.total).toBe(1);
     });
   });
 });
