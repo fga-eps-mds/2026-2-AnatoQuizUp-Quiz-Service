@@ -43,6 +43,15 @@ enum FonteMoeda {
   USO_POTENCIALIZADOR
 }
 
+enum StatusTentativaQuiz {
+  EM_ANDAMENTO
+  CONCLUIDA
+}
+
+enum OrigemXp {
+  QUIZ_CONCLUIDO
+}
+
 enum StatusResolucaoLista {
   EM_ANDAMENTO
   SUBMETIDA
@@ -185,13 +194,84 @@ model ResolucaoQuestao {
   usuarioId String
   questaoId String
 
-  questao Questao @relation(fields: [questaoId], references: [id], onDelete: Restrict)
+  // Rodada de quiz a que a resposta pertence (null = resposta avulsa/legada).
+  tentativaId String?
+
+  questao   Questao        @relation(fields: [questaoId], references: [id], onDelete: Restrict)
+  tentativa TentativaQuiz? @relation(fields: [tentativaId], references: [id], onDelete: SetNull)
 
   criadoEm     DateTime  @default(now())
   atualizadoEm DateTime  @updatedAt
   excluidoEm   DateTime?
 
+  // Dentro de uma rodada, cada questao so pode ser respondida uma vez.
+  @@unique([tentativaId, questaoId])
   @@map("resolucoes_questoes")
+}
+
+// Rodada finita de quiz (ate 10 questoes). Concluir a rodada e o que concede XP.
+model TentativaQuiz {
+  id        String @id @default(cuid())
+  usuarioId String
+
+  // Filtros escolhidos na tela de quiz (null = sem filtro / quiz aleatorio).
+  tema        String?
+  dificuldade Dificuldade?
+
+  // Questoes sorteadas para a rodada, na ordem em que foram entregues.
+  questaoIds    String[]
+  totalQuestoes Int
+  totalAcertos  Int?
+
+  status      StatusTentativaQuiz @default(EM_ANDAMENTO)
+  iniciadaEm  DateTime            @default(now())
+  concluidaEm DateTime?
+
+  respostas   ResolucaoQuestao[]
+  transacaoXp TransacaoXp?
+
+  @@index([usuarioId, iniciadaEm])
+  @@map("tentativas_quiz")
+}
+
+// XP acumulado do usuario. Permanente: so cresce, e a base do nivel e do ranking geral.
+model ProgressoXp {
+  id        String @id @default(cuid())
+  usuarioId String @unique
+  xpTotal   Int    @default(0)
+
+  transacoes TransacaoXp[]
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@map("progressos_xp")
+}
+
+// Historico de XP recebido. tentativaId unico garante que a mesma rodada nao paga duas vezes.
+model TransacaoXp {
+  id String @id @default(cuid())
+
+  usuarioId   String
+  tentativaId String? @unique
+
+  origem OrigemXp @default(QUIZ_CONCLUIDO)
+
+  xpBase          Int
+  bonusDesempenho Int
+  bonusPowerUp    Int @default(0)
+  quantidade      Int
+
+  // XP acumulado logo apos esta transacao (permite reconstruir o nivel da epoca).
+  xpTotalApos Int
+
+  progresso ProgressoXp    @relation(fields: [usuarioId], references: [usuarioId], onDelete: Restrict)
+  tentativa TentativaQuiz? @relation(fields: [tentativaId], references: [id], onDelete: Restrict)
+
+  criadoEm DateTime @default(now())
+
+  @@index([usuarioId, criadoEm])
+  @@map("transacoes_xp")
 }
 
 model CarteiraMoedas {

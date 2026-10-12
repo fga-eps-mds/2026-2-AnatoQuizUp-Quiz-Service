@@ -114,4 +114,15 @@ export const MENSAGENS = {
   conquistaNaoEncontrada: "Conquista nao encontrada.",
 
   limiteConquistasDestacadas: "Apenas tres conquistas podem ser destacadas.",
+
+  // Mensagens das rodadas de quiz e da progressao por XP.
+  tentativaNaoEncontrada: "Rodada de quiz nao encontrada.",
+
+  tentativaJaConcluida: "Esta rodada de quiz ja foi concluida.",
+
+  tentativaIncompleta: "Responda todas as questoes da rodada antes de concluir.",
+
+  questaoForaDaTentativa: "Esta questao nao faz parte da rodada de quiz.",
+
+  questaoJaRespondidaNaTentativa: "Esta questao ja foi respondida nesta rodada.",
 } as const;

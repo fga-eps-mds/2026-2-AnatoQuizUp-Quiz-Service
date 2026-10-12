@@ -18,24 +18,41 @@ describe("RankingService.obterPontuacoes", () => {
 
   it("converte bigint para number, formata a data e ordena por acertos", async () => {
     repositoryMock.agregarPontuacoes.mockResolvedValue([
-      { usuarioId: "u1", acertos: 2n, respondidas: 4n, ultimaAtividade: new Date("2026-01-01T00:00:00.000Z") },
-      { usuarioId: "u2", acertos: 5n, respondidas: 6n, ultimaAtividade: null },
+      { usuarioId: "u1", acertos: 2n, respondidas: 4n, ultimaAtividade: new Date("2026-01-01T00:00:00.000Z"), xpTotal: 0 },
+      { usuarioId: "u2", acertos: 5n, respondidas: 6n, ultimaAtividade: null, xpTotal: null },
     ]);
 
     const resultado = await service.obterPontuacoes();
 
     expect(resultado[0]).toEqual({
       usuarioId: "u2",
+      xpTotal: 0,
+      nivel: 1,
       totalAcertos: 5,
       totalRespondidas: 6,
       ultimaAtividade: null,
     });
     expect(resultado[1]).toEqual({
       usuarioId: "u1",
+      xpTotal: 0,
+      nivel: 1,
       totalAcertos: 2,
       totalRespondidas: 4,
       ultimaAtividade: "2026-01-01T00:00:00.000Z",
     });
+  });
+
+  it("ordena por XP antes dos acertos e calcula o nivel de cada usuario", async () => {
+    repositoryMock.agregarPontuacoes.mockResolvedValue([
+      { usuarioId: "muitos-acertos", acertos: 50n, respondidas: 60n, ultimaAtividade: null, xpTotal: 90 },
+      { usuarioId: "mais-xp", acertos: 10n, respondidas: 20n, ultimaAtividade: null, xpTotal: 320n },
+    ]);
+
+    const resultado = await service.obterPontuacoes();
+
+    expect(resultado.map((linha) => linha.usuarioId)).toEqual(["mais-xp", "muitos-acertos"]);
+    expect(resultado[0]).toMatchObject({ xpTotal: 320, nivel: 3 });
+    expect(resultado[1]).toMatchObject({ xpTotal: 90, nivel: 1 });
   });
 
   it("repassa a lista de ids ao repositorio", async () => {
@@ -50,10 +67,19 @@ describe("RankingService.obterPontuacoes", () => {
 describe("compararPontuacoes", () => {
   const base: PontuacaoUsuario = {
     usuarioId: "x",
+    xpTotal: 0,
+    nivel: 1,
     totalAcertos: 0,
     totalRespondidas: 0,
     ultimaAtividade: null,
   };
+
+  it("coloca quem tem mais XP na frente, mesmo com menos acertos", () => {
+    const maisXp = { ...base, xpTotal: 200, totalAcertos: 1 };
+    const maisAcertos = { ...base, xpTotal: 100, totalAcertos: 9 };
+    expect(compararPontuacoes(maisXp, maisAcertos)).toBeLessThan(0);
+    expect(compararPontuacoes(maisAcertos, maisXp)).toBeGreaterThan(0);
+  });
 
   it("coloca quem tem mais acertos na frente", () => {
     expect(compararPontuacoes({ ...base, totalAcertos: 1 }, { ...base, totalAcertos: 2 })).toBeGreaterThan(0);

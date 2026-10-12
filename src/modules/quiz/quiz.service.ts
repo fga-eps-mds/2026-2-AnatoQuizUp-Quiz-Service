@@ -16,7 +16,7 @@ import {
 import type { QuantidadeQuestoesPorTema } from "./dto/responses/quantidade_questao_tema_dto";
 import { type ResolucaoQuestaoUsuarioDto } from "./dto/responses/resolucao_questao_usuario_dto";
 import { converterResolucaoQuestaoBancoToApi } from "./dto/mappers/historico_quiz.mapper";
-import type { Dificuldade } from "@prisma/client";
+import { StatusTentativaQuiz, type Dificuldade } from "@prisma/client";
 import type { ConquistaService } from "../conquistas/conquistas.service";
 import type { UsoItemRepository } from "../loja/uso-item.repository";
 
@@ -119,6 +119,11 @@ export class QuizService {
       });
     }
 
+    // Resposta dentro de uma rodada: valida a rodada antes de gravar/premiar.
+    if (data.tentativaId) {
+      await this.validarRespostaDaRodada(data.tentativaId, id_usuario, data.questaoId);
+    }
+
     // Registra a tentativa (compoe o historico do aluno).
     const tentativa_registrada = await this.quizRepository.registrarTentativa(data, id_usuario);
 
@@ -190,6 +195,57 @@ export class QuizService {
       conquistasDesbloqueadas: conquistas,
       potencializadorAplicado,
     };
+  }
+
+  /**
+   * Garante que a resposta pode entrar na rodada: a rodada e do usuario, ainda
+   * esta em andamento, a questao faz parte dela e ainda nao foi respondida.
+   *
+   * @throws ErroAplicacao 404 rodada inexistente; 409 rodada concluida ou questao
+   * ja respondida; 400 questao fora da rodada.
+   */
+  private async validarRespostaDaRodada(
+    tentativaId: string,
+    id_usuario: string,
+    questaoId: string,
+  ): Promise<void> {
+    const tentativa = await this.quizRepository.buscarTentativaParaResposta(
+      tentativaId,
+      id_usuario,
+      questaoId,
+    );
+
+    if (!tentativa) {
+      throw new ErroAplicacao({
+        codigoStatus: 404,
+        codigo: CodigoDeErro.NAO_ENCONTRADO,
+        mensagem: MENSAGENS.tentativaNaoEncontrada,
+      });
+    }
+
+    if (tentativa.status === StatusTentativaQuiz.CONCLUIDA) {
+      throw new ErroAplicacao({
+        codigoStatus: 409,
+        codigo: CodigoDeErro.CONFLITO,
+        mensagem: MENSAGENS.tentativaJaConcluida,
+      });
+    }
+
+    if (!tentativa.questaoIds.includes(questaoId)) {
+      throw new ErroAplicacao({
+        codigoStatus: 400,
+        codigo: CodigoDeErro.REQUISICAO_INVALIDA,
+        mensagem: MENSAGENS.questaoForaDaTentativa,
+      });
+    }
+
+    if (tentativa.respostas.length > 0) {
+      throw new ErroAplicacao({
+        codigoStatus: 409,
+        codigo: CodigoDeErro.CONFLITO,
+        mensagem: MENSAGENS.questaoJaRespondidaNaTentativa,
+      });
+    }
   }
 
   // Retorna o saldo de moedas do usuario (exige autenticacao).
