@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+
 import { StatusTentativaQuiz } from "@prisma/client";
 
 import { converterParaRespostaQuestaoQuiz } from "@/modules/quiz/dto/mappers/converter_para_resposta_questao_quiz";
@@ -270,11 +272,12 @@ export class ProgressaoService {
     }
   }
 
-  // Embaralha (Fisher-Yates) sem mutar o array original.
+  // Embaralha (Fisher-Yates) sem mutar o array original. Usa o gerador do
+  // modulo crypto em vez de Math.random para atender a regra de seguranca do Sonar.
   private embaralhar<T>(array: T[]): T[] {
     const copia = [...array];
     for (let i = copia.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = randomInt(i + 1);
       [copia[i], copia[j]] = [copia[j], copia[i]];
     }
     return copia;
