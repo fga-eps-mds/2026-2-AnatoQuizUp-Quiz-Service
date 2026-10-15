@@ -24,6 +24,17 @@ module.exports = {
     "!src/shared/middlewares/papeis.middleware.ts",
     "!src/shared/middlewares/tratamento-erros.middleware.ts",
   ],
+  reporters: [
+    "default",
+    [
+      "@casualbot/jest-sonar-reporter",
+      {
+        outputDirectory: ".",
+        outputName: "sonar-report.xml",
+        relativePaths: true,
+      },
+    ],
+  ],
   coverageReporters: ["text", "lcov", "json-summary"],
   coverageThreshold: {
     global: {
