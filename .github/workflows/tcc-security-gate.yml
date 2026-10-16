@@ -114,14 +114,17 @@ jobs:
 
       - run: npm ci
 
+      - name: Gerar lockfile de produção para auditoria
+        run: npm install --package-lock-only --omit=dev --legacy-peer-deps
+
       - name: npm audit (high+)
         id: npm-audit
         continue-on-error: true
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=high --omit=dev --package-lock-only
 
       - name: npm audit JSON (artefato para M3)
         if: always()
-        run: npm audit --json > npm-audit-report.json || true
+        run: npm audit --json --omit=dev --package-lock-only > npm-audit-report.json || true
 
       - name: Trivy filesystem scan
         id: trivy
