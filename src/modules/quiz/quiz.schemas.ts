@@ -19,6 +19,7 @@ export const schemaBuscarQuestaoQuiz = z.object({
 });
 
 // Body da resposta: union discriminada por "tipo" para validar as alternativas certas.
+// tentativaId (opcional) liga a resposta a uma rodada de quiz.
 export const schemaResponderQuestaoQuiz = z.discriminatedUnion("tipo", [
   // Multipla escolha: alternativas de A a E.
   z.object({
@@ -27,6 +28,8 @@ export const schemaResponderQuestaoQuiz = z.discriminatedUnion("tipo", [
     tipo: z.literal(TIPO_QUESTAO_API.MULTIPLA_ESCOLHA),
 
     respostaMarcada: z.enum(["A", "B", "C", "D", "E"]),
+
+    tentativaId: z.string().trim().min(1).optional(),
   }),
 
   // Certo/errado: apenas C (certo) ou E (errado).
@@ -36,6 +39,8 @@ export const schemaResponderQuestaoQuiz = z.discriminatedUnion("tipo", [
     tipo: z.literal(TIPO_QUESTAO_API.CERTO_ERRADO),
 
     respostaMarcada: z.enum(["C", "E"]),
+
+    tentativaId: z.string().trim().min(1).optional(),
   }),
 ]);
 

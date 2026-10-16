@@ -7,12 +7,14 @@ export interface LinhaPontuacao {
   acertos: bigint;
   respondidas: bigint;
   ultimaAtividade: Date | null;
+  xpTotal: number | bigint | null;
 }
 
 export class RankingRepository {
   /**
-   * Agrega o desempenho de cada usuário a partir das resoluções avulsas de
-   * questões. Quando `usuarioIds` é informado, restringe o cálculo a esses
+   * Agrega o desempenho de cada usuário a partir das resoluções de questões
+   * e junta o XP acumulado (0 para quem ainda não concluiu nenhuma rodada de
+   * quiz). Quando `usuarioIds` é informado, restringe o cálculo a esses
    * usuários (usado pelo ranking de amigos); caso contrário, considera todos
    * os participantes (ranking geral).
    *
@@ -30,9 +32,11 @@ export class RankingRepository {
         r."usuarioId" AS "usuarioId",
         COUNT(*) FILTER (WHERE r."respostaMarcada" = q."respostaCorreta") AS "acertos",
         COUNT(*) AS "respondidas",
-        MAX(r."criadoEm") AS "ultimaAtividade"
+        MAX(r."criadoEm") AS "ultimaAtividade",
+        COALESCE(MAX(p."xpTotal"), 0) AS "xpTotal"
       FROM "resolucoes_questoes" r
       JOIN "questoes" q ON q."id" = r."questaoId"
+      LEFT JOIN "progressos_xp" p ON p."usuarioId" = r."usuarioId"
       WHERE r."excluidoEm" IS NULL
       ${filtroIds}
       GROUP BY r."usuarioId"

@@ -6,8 +6,10 @@ import { montarFiltroPrisma } from "@/modules/questoes/dto/question.types";
 import { prisma } from "@/config/db";
 import type { ParametrosPaginacao } from "@/shared/utils/paginacao.util";
 import type { ResponderQuestaoQuizDto } from "./dto/requests/responder_questao_quiz_dto";
-import type { Prisma } from "@prisma/client";
-import { FonteMoeda } from "@prisma/client";
+import { FonteMoeda, Prisma } from "@prisma/client";
+import { MENSAGENS } from "@/shared/constants/mensagens";
+import { CodigoDeErro } from "@/shared/errors/codigos-de-erro";
+import { ErroAplicacao } from "@/shared/errors/erro-aplicacao";
 
 // Repository do quiz (Prisma): consulta questoes para o quiz, registra tentativas,
 // concede moedas por acerto e monta o historico de respostas do usuario.
@@ -83,16 +85,53 @@ export class QuizRepository {
   /**
    * Registra a tentativa do usuario (uma linha de resolucao por resposta).
    *
-   * @param data Resposta enviada (questao, tipo e alternativa).
+   * Quando a resposta pertence a uma rodada, grava o tentativaId. A chave unica
+   * (tentativaId, questaoId) impede responder a mesma questao duas vezes na rodada.
+   *
+   * @param data Resposta enviada (questao, tipo, alternativa e rodada opcional).
    * @param usuarioId Aluno que respondeu.
    * @returns A resolucao criada.
+   * @throws ErroAplicacao 409 se a questao ja foi respondida nesta rodada.
    */
   async registrarTentativa(data: ResponderQuestaoQuizDto, usuarioId: string) {
-    return await prisma.resolucaoQuestao.create({
-      data: {
-        respostaMarcada: data.respostaMarcada,
-        questaoId: data.questaoId,
-        usuarioId: usuarioId,
+    try {
+      return await prisma.resolucaoQuestao.create({
+        data: {
+          respostaMarcada: data.respostaMarcada,
+          questaoId: data.questaoId,
+          usuarioId: usuarioId,
+          ...(data.tentativaId && { tentativaId: data.tentativaId }),
+        },
+      });
+    } catch (error) {
+      // Duas requisicoes simultaneas para a mesma questao da rodada: a segunda cai aqui.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new ErroAplicacao({
+          codigoStatus: 409,
+          codigo: CodigoDeErro.CONFLITO,
+          mensagem: MENSAGENS.questaoJaRespondidaNaTentativa,
+        });
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Busca a rodada do usuario com o minimo para validar uma resposta: status,
+   * questoes da rodada e se a questao informada ja foi respondida nela.
+   *
+   * @param tentativaId Id da rodada.
+   * @param usuarioId Dono esperado da rodada.
+   * @param questaoId Questao que esta sendo respondida.
+   * @returns Dados da rodada, ou null se nao existir/nao for do usuario.
+   */
+  async buscarTentativaParaResposta(tentativaId: string, usuarioId: string, questaoId: string) {
+    return await prisma.tentativaQuiz.findFirst({
+      where: { id: tentativaId, usuarioId },
+      select: {
+        status: true,
+        questaoIds: true,
+        respostas: { where: { questaoId, excluidoEm: null }, select: { id: true } },
       },
     });
   }

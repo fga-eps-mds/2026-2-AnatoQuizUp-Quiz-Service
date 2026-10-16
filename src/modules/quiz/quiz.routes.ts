@@ -14,6 +14,7 @@ import {
 import { ConquistaService } from "../conquistas/conquistas.service";
 import { ConquistaRepository } from "../conquistas/conquistas.repository";
 import { UsoItemRepository } from "../loja/uso-item.repository";
+import { progressaoRouter } from "../progressao/progressao.routes";
 
 // Montagem das dependencias; o quiz depende do service de conquistas para premiar acertos.
 const quizRepository = new QuizRepository();
@@ -54,5 +55,8 @@ quizRouter.get(
   validarRequisicao(schemaHistoricoQuizQuestoesUsuario, "query"),
   quizController.buscarHistorico,
 );
+
+// Rodadas de quiz, nivel e historico de XP (/quiz/tentativas, /quiz/progresso, /quiz/xp/historico).
+quizRouter.use(progressaoRouter);
 
 export { quizRouter };
