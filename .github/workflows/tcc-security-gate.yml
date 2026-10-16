@@ -51,7 +51,7 @@ jobs:
       - run: npm ci
       - run: npm run prisma:generate
       - run: npx prisma db push --skip-generate
-      - run: npm test -- --coverage --passWithNoTests
+      - run: npm run test:ci
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@299e4b793aaa83bf2aba7c9c14bedbb485688ec4

@@ -6,7 +6,7 @@
   "main": "dist/src/server.js",
   "scripts": {
     "dev": "tsx watch -r tsconfig-paths/register src/server.ts",
-    "build": "tsc --project tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "build": "tsc --project tsconfig.build.json --noEmit && esbuild src/server.ts prisma/seed-catalogo.ts prisma/seed-homologacao.ts --bundle --platform=node --target=node24 --packages=external --outdir=dist --outbase=.",
     "start": "npx prisma migrate deploy && node dist/src/server.js",
     "lint": "eslint . --ext .ts",
     "test": "jest",
@@ -63,6 +63,7 @@
     "@babel/core": "^7.29.0",
     "@babel/preset-env": "^7.29.2",
     "@babel/preset-typescript": "^7.28.5",
+    "@casualbot/jest-sonar-reporter": "^2.7.1",
     "@eslint/js": "^9.38.0",
     "@types/cors": "^2.8.19",
     "@types/ejs": "^3.1.5",
@@ -73,6 +74,7 @@
     "@types/supertest": "^7.2.0",
     "babel-jest": "^30.3.0",
     "babel-plugin-module-resolver": "^5.0.3",
+    "esbuild": "^0.28.2",
     "eslint": "^9.38.0",
     "eslint-config-prettier": "^10.1.8",
     "jest": "^30.3.0",
@@ -80,10 +82,12 @@
     "prisma": "^6.17.1",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.9",
-    "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.1"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2"
   }
 }

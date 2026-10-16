@@ -1,139 +1,49 @@
 name: Release - Quiz-Service
 
 on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+  release:
+    types: [published]
+
+permissions:
+  contents: write
 
 jobs:
   release:
-    name: Publicar release com asset e metricas
+    name: Adicionar código-fonte e testes à Release
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: anatoquizup_quiz_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      NODE_ENV: test
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
-      INTERNAL_TOKEN: ${{ secrets.INTERNAL_TOKEN }}
-
     steps:
-      - name: Checkout
+      - name: Validar tag SemVer
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag inválida: $TAG"
+            exit 1
+          fi
+
+      - name: Checkout da release
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.release.tag_name }}
           fetch-depth: 0
 
-      - name: Extrair versao da tag
-        id: version
+      - name: Compactar código-fonte e testes
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          MAJOR=$(echo "$TAG" | cut -d. -f1 | tr -d 'v')
-          MINOR=$(echo "$TAG" | cut -d. -f2)
-          PATCH=$(echo "$TAG" | cut -d. -f3)
-          echo "major=$MAJOR" >> $GITHUB_OUTPUT
-          echo "minor=$MINOR" >> $GITHUB_OUTPUT
-          echo "patch=$PATCH" >> $GITHUB_OUTPUT
-          echo "is_major=$( [ "$MINOR" = "0" ] && [ "$PATCH" = "0" ] && echo true || echo false )" >> $GITHUB_OUTPUT
-
-      - name: Compactar codigo-fonte e testes
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
           ARCHIVE="AnatoQuizUp-Quiz-Service-${TAG}.zip"
-          zip -r "$ARCHIVE" src/ tests/ prisma/ package.json package-lock.json \
-            sonar-project.properties tsconfig*.json jest.config.cjs \
-            --exclude "*.DS_Store" "node_modules/*" "coverage/*" "dist/*" "build/*"
-          echo "ARCHIVE=$ARCHIVE" >> $GITHUB_ENV
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
+          git archive --format=zip --output="$ARCHIVE" "$TAG"
 
-      - name: Instalar dependencias
-        run: npm ci
+          unzip -l "$ARCHIVE" | grep 'src/'
+          unzip -l "$ARCHIVE" | grep 'tests/'
 
-      - name: Gerar Prisma Client
-        run: npm run prisma:generate
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
 
-      - name: Rodar testes com cobertura
-        run: npm test -- --coverage --passWithNoTests
-
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@299e4b793aaa83bf2aba7c9c14bedbb485688ec4
+      - name: Adicionar ZIP à GitHub Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-      - name: Aguardar SonarCloud Quality Gate
-        uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b
-        timeout-minutes: 5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-      - name: Exportar metrics.json
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          PROJECT_KEY: fga-eps-mds_2026-2-AnatoQuizUp-Quiz-Service
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
         run: |
-          SEMESTER="2026_2"
-          PROJECT_NAME="AnatoQuizUp"
-          REPO_NAME="Quiz-Service"
-          DATE_HORA=$(date -u +"%m-%d-%Y-%H-%M-%S")
-          VERSAO_RELEASE="${{ steps.version.outputs.tag }}"
-          FILENAME="fga-eps-mds-${SEMESTER}_UNB-${PROJECT_NAME}-${REPO_NAME}-${DATE_HORA}-${VERSAO_RELEASE}.json"
-
-          METRIC_LIST="files,functions,complexity,comment_lines_density,duplicated_lines_density,coverage,ncloc,tests,test_errors,test_failures,test_execution_time,security_rating"
-          curl -s -u "$SONAR_TOKEN:" \
-            "https://sonarcloud.io/api/measures/component?component=${PROJECT_KEY}&metricKeys=${METRIC_LIST}" \
-            -o raw.json
-
-          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          echo "{\"timestamp\":\"$TIMESTAMP\",\"tag\":\"$VERSAO_RELEASE\",\"commit\":\"${{ github.sha }}\",\"filename\":\"$FILENAME\",\"data\":$(cat raw.json)}" > "$FILENAME"
-          echo "METRICS_FILE=$FILENAME" >> $GITHUB_ENV
-          cat "$FILENAME"
-
-      - name: Criar GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: "Release ${{ steps.version.outputs.tag }} - Quiz-Service"
-          generate_release_notes: true
-          files: |
-            ${{ env.ARCHIVE }}
-            ${{ env.METRICS_FILE }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publicar metrics.json em analytics-raw-data no repo de Doc
-        env:
-          DOC_PUSH_TOKEN: ${{ secrets.DOC_PUSH_TOKEN }}
-        run: |
-          if [ -z "$DOC_PUSH_TOKEN" ]; then
-            echo "::warning::Secret DOC_PUSH_TOKEN nao configurada, pulando commit no repo de doc."
-            exit 0
-          fi
-          git clone --depth 1 https://x-access-token:$DOC_PUSH_TOKEN@github.com/fga-eps-mds/2026-2-AnatoQuizUp-Doc.git doc-repo
-          cd doc-repo
-          mkdir -p analytics-raw-data/quiz-service
-          cp "../${{ env.METRICS_FILE }}" "analytics-raw-data/quiz-service/${{ env.METRICS_FILE }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add analytics-raw-data/
-          git commit -m "chore(metrics): release quiz-service ${{ steps.version.outputs.tag }} [skip ci]" || echo "Sem mudancas para commitar."
-          git push
+          gh release upload "$TAG" "$ARCHIVE" --clobber
