@@ -264,6 +264,9 @@ export function montarProgressoNivel(
     xpFaltante: inicioDoProximo - xp,
     percentual: Math.floor((xpNoNivel / xpNecessarioNoNivel) * 100),
     eloAtual,
+    // Na tela "Minha progressao" (Figma), "Elo atual" e "Maior elo (Conquista preservada)"
+    // sao exibidos em cards distintos. Pela regra de nao-regressao (o estudante nunca
+    // perde um elo ja conquistado), o elo ativo resolvido coincide sempre com o maior elo.
     maiorElo: eloAtual,
     proximoElo,
     xpNoElo,
