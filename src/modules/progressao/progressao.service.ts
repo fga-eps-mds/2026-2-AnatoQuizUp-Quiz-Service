@@ -19,7 +19,6 @@ import {
   calcularNivel,
   calcularRecompensaXp,
   montarProgressoNivel,
-  resolverFaixaElo,
 } from "./progressao.regras";
 import type { ProgressaoRepository, TentativaParaConclusao } from "./progressao.repository";
 import type {
@@ -241,12 +240,16 @@ export class ProgressaoService {
     const nivelAnterior = calcularNivel(xpAntes);
     const nivelApos = calcularNivel(xpApos);
 
+    const progresso = montarProgressoNivel(xpTotalAtual, maiorElo);
+    const progressoDaTentativa =
+      xpApos === xpTotalAtual ? progresso : montarProgressoNivel(xpApos, maiorElo);
+
     const eloAposPeloXp = calcularFaixaEloPorXp(xpApos);
-    const novoElo = resolverFaixaElo(xpApos, maiorElo);
+    const novoElo = progressoDaTentativa.eloAtual;
     const eloAnterior =
       novoElo.ordem > eloAposPeloXp.ordem ? novoElo : calcularFaixaEloPorXp(xpAntes);
     const subiuDeElo = novoElo.ordem > eloAnterior.ordem;
-    const xpExcedenteElo = Math.max(0, xpApos - novoElo.xpMinimo);
+    const xpExcedenteElo = progressoDaTentativa.xpNoElo;
 
     return {
       tentativaId: tentativa.id,
@@ -256,7 +259,7 @@ export class ProgressaoService {
       totalAcertos: tentativa.totalAcertos ?? 0,
       jaConcluida,
       recompensa,
-      progresso: montarProgressoNivel(xpTotalAtual, maiorElo),
+      progresso,
       subiuDeNivel: nivelApos > nivelAnterior,
       nivelAnterior,
       subiuDeElo,
