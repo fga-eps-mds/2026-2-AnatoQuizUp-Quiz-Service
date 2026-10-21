@@ -64,6 +64,15 @@ jobs:
       - name: Build do projeto
         run: npm run build
 
+      - name: Validar artefatos usados na execução e nos testes de segurança
+        run: |
+          for file in dist/src/server.js dist/prisma/seed.js dist/prisma/seed.e2e.js dist/prisma/seed-catalogo.js dist/prisma/seed-homologacao.js; do
+            test -s "$file" || {
+              echo "::error::Artefato obrigatório ausente: $file"
+              exit 1
+            }
+          done
+
       - name: Rodar testes com cobertura e relatório Sonar
         id: jest
         run: npm run test:ci
