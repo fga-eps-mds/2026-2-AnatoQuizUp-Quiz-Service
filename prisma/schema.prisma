@@ -52,6 +52,16 @@ enum OrigemXp {
   QUIZ_CONCLUIDO
 }
 
+enum EloXp {
+  CURIOSO
+  ACADEMICO
+  INTERNO
+  R1
+  R3
+  R6
+  STAFF_DO_SERVICO
+}
+
 enum StatusResolucaoLista {
   EM_ANDAMENTO
   SUBMETIDA
@@ -235,10 +245,13 @@ model TentativaQuiz {
 }
 
 // XP acumulado do usuario. Permanente: so cresce, e a base do nivel e do ranking geral.
+// maiorElo preserva o maior elo ja conquistado para que mudancas futuras nas faixas
+// nunca reduzam automaticamente o elo do estudante.
 model ProgressoXp {
   id        String @id @default(cuid())
   usuarioId String @unique
   xpTotal   Int    @default(0)
+  maiorElo  EloXp  @default(CURIOSO)
 
   transacoes TransacaoXp[]
 
