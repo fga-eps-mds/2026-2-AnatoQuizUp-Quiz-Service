@@ -6,7 +6,7 @@
   "main": "dist/src/server.js",
   "scripts": {
     "dev": "tsx watch -r tsconfig-paths/register src/server.ts",
-    "build": "tsc --project tsconfig.build.json --noEmit && esbuild src/server.ts prisma/seed-catalogo.ts prisma/seed-homologacao.ts --bundle --platform=node --target=node24 --packages=external --outdir=dist --outbase=.",
+    "build": "tsc --project tsconfig.build.json --noEmit && esbuild src/server.ts prisma/seed.ts prisma/seed.e2e.ts prisma/seed-catalogo.ts prisma/seed-homologacao.ts --bundle --platform=node --target=node24 --packages=external --outdir=dist --outbase=.",
     "start": "npx prisma migrate deploy && node dist/src/server.js",
     "lint": "eslint . --ext .ts",
     "test": "jest",
