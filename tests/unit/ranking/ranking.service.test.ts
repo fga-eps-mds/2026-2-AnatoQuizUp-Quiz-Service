@@ -1,3 +1,5 @@
+import { EloXp } from "@prisma/client";
+
 import {
   RankingService,
   compararPontuacoes,
@@ -16,7 +18,7 @@ describe("RankingService.obterPontuacoes", () => {
     service = new RankingService(repositoryMock);
   });
 
-  it("converte bigint para number, formata a data e ordena por acertos", async () => {
+  it("converte bigint para number, formata a data, calcula o elo e ordena", async () => {
     repositoryMock.agregarPontuacoes.mockResolvedValue([
       { usuarioId: "u1", acertos: 2n, respondidas: 4n, ultimaAtividade: new Date("2026-01-01T00:00:00.000Z"), xpTotal: 0 },
       { usuarioId: "u2", acertos: 5n, respondidas: 6n, ultimaAtividade: null, xpTotal: null },
@@ -28,6 +30,7 @@ describe("RankingService.obterPontuacoes", () => {
       usuarioId: "u2",
       xpTotal: 0,
       nivel: 1,
+      elo: "Curioso",
       totalAcertos: 5,
       totalRespondidas: 6,
       ultimaAtividade: null,
@@ -36,23 +39,24 @@ describe("RankingService.obterPontuacoes", () => {
       usuarioId: "u1",
       xpTotal: 0,
       nivel: 1,
+      elo: "Curioso",
       totalAcertos: 2,
       totalRespondidas: 4,
       ultimaAtividade: "2026-01-01T00:00:00.000Z",
     });
   });
 
-  it("ordena por XP antes dos acertos e calcula o nivel de cada usuario", async () => {
+  it("ordena por XP antes dos acertos e calcula nivel e elo de cada usuario", async () => {
     repositoryMock.agregarPontuacoes.mockResolvedValue([
       { usuarioId: "muitos-acertos", acertos: 50n, respondidas: 60n, ultimaAtividade: null, xpTotal: 90 },
-      { usuarioId: "mais-xp", acertos: 10n, respondidas: 20n, ultimaAtividade: null, xpTotal: 320n },
+      { usuarioId: "mais-xp", acertos: 10n, respondidas: 20n, ultimaAtividade: null, xpTotal: 1520n, maiorElo: EloXp.INTERNO },
     ]);
 
     const resultado = await service.obterPontuacoes();
 
     expect(resultado.map((linha) => linha.usuarioId)).toEqual(["mais-xp", "muitos-acertos"]);
-    expect(resultado[0]).toMatchObject({ xpTotal: 320, nivel: 3 });
-    expect(resultado[1]).toMatchObject({ xpTotal: 90, nivel: 1 });
+    expect(resultado[0]).toMatchObject({ xpTotal: 1520, nivel: 6, elo: "Interno" });
+    expect(resultado[1]).toMatchObject({ xpTotal: 90, nivel: 1, elo: "Curioso" });
   });
 
   it("repassa a lista de ids ao repositorio", async () => {
@@ -69,6 +73,7 @@ describe("compararPontuacoes", () => {
     usuarioId: "x",
     xpTotal: 0,
     nivel: 1,
+    elo: "Curioso",
     totalAcertos: 0,
     totalRespondidas: 0,
     ultimaAtividade: null,

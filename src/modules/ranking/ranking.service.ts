@@ -1,4 +1,4 @@
-import { calcularNivel } from '../progressao/progressao.regras';
+import { calcularNivel, resolverFaixaElo } from '../progressao/progressao.regras';
 
 import type { RankingRepository } from './ranking.repository';
 import type { PontuacaoUsuario } from './ranking.types';
@@ -36,11 +36,13 @@ export class RankingService {
 
     const pontuacoes: PontuacaoUsuario[] = linhas.map((linha) => {
       const xpTotal = Number(linha.xpTotal ?? 0);
+      const faixaElo = resolverFaixaElo(xpTotal, linha.maiorElo);
 
       return {
         usuarioId: linha.usuarioId,
         xpTotal,
         nivel: calcularNivel(xpTotal),
+        elo: faixaElo.nome,
         totalAcertos: Number(linha.acertos),
         totalRespondidas: Number(linha.respondidas),
         ultimaAtividade: linha.ultimaAtividade ? linha.ultimaAtividade.toISOString() : null,
