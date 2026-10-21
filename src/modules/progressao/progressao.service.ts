@@ -234,16 +234,18 @@ export class ProgressaoService {
         }
       : RECOMPENSA_ZERADA;
 
-    // Nivel e elo antes/depois desta rodada, reconstruidos pelo XP acumulado da epoca.
+    // Nivel e elo antes/depois desta rodada, reconstruidos pelo XP acumulado da epoca
+    // e respeitando a regra de nao regressao caso o aluno ja tivesse um maiorElo superior.
     const xpApos = transacao ? transacao.xpTotalApos : xpTotalAtual;
     const xpAntes = Math.max(0, xpApos - recompensa.xpTotalRecebido);
     const nivelAnterior = calcularNivel(xpAntes);
     const nivelApos = calcularNivel(xpApos);
 
-    const eloAnterior = calcularFaixaEloPorXp(xpAntes);
     const eloAposPeloXp = calcularFaixaEloPorXp(xpApos);
     const novoElo = resolverFaixaElo(xpApos, maiorElo);
-    const subiuDeElo = eloAposPeloXp.ordem > eloAnterior.ordem;
+    const eloAnterior =
+      novoElo.ordem > eloAposPeloXp.ordem ? novoElo : calcularFaixaEloPorXp(xpAntes);
+    const subiuDeElo = novoElo.ordem > eloAnterior.ordem;
     const xpExcedenteElo = Math.max(0, xpApos - novoElo.xpMinimo);
 
     return {

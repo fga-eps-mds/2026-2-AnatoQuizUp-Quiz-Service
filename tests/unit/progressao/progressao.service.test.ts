@@ -281,6 +281,27 @@ describe("ProgressaoService", () => {
       expect(resultado.progresso.xpFaltanteProximoElo).toBe(990);
     });
 
+    it("preserva o maiorElo em eloAnterior e nao sinaliza subiuDeElo quando o aluno ja tinha elo superior", async () => {
+      const transacao = criarTransacao({ quantidade: 20, xpTotalApos: 510 });
+      repository.buscarTentativaParaConclusao
+        .mockResolvedValueOnce(criarTentativa({ respostas: respostasCompletas }))
+        .mockResolvedValueOnce(
+          criarTentativa({
+            status: StatusTentativaQuiz.CONCLUIDA,
+            totalAcertos: 3,
+            transacaoXp: transacao,
+          }),
+        );
+      repository.concluirTentativa.mockResolvedValue({ concluidaAgora: true });
+      repository.buscarDadosProgresso.mockResolvedValue({ xpTotal: 510, maiorElo: EloXp.R3 });
+
+      const resultado = await service.concluirTentativa("tentativa-1", "aluno-1", PAPEIS.ALUNO);
+
+      expect(resultado.eloAnterior.nome).toBe("R3");
+      expect(resultado.novoElo.nome).toBe("R3");
+      expect(resultado.subiuDeElo).toBe(false);
+    });
+
     it("nao credita de novo quando a rodada ja estava concluida (refresh/nova requisicao)", async () => {
       repository.buscarTentativaParaConclusao.mockResolvedValue(
         criarTentativa({
