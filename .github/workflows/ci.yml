@@ -27,6 +27,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anatoquizup_quiz_test?schema=public
       JWT_SECRET_KEY: ci-test-secret
       INTERNAL_TOKEN: ci-test-internal-token
+      MISSOES_DATABASE_TEST_URL: enabled
 
     steps:
       - name: Checkout
@@ -58,8 +59,8 @@ jobs:
       - name: Gerar Prisma Client
         run: npm run prisma:generate
 
-      - name: Criar tabelas no banco de testes
-        run: npx prisma db push
+      - name: Aplicar migrações e catálogo ao banco de testes
+        run: npx prisma migrate deploy
 
       - name: Build do projeto
         run: npm run build

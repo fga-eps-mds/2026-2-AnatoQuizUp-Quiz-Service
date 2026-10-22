@@ -26,6 +26,16 @@ suite("missões diárias no PostgreSQL", () => {
       await contabilizarResposta(tx, usuario, questao, correta, instante);
     });
   afterAll(async () => {
+    const usuarios = [usuario, `${usuario}-resposta`, `${usuario}-rollback`, `${usuario}-rodada`];
+    await prisma.transacaoXp.deleteMany({ where: { usuarioId: { in: usuarios } } });
+    await prisma.progressoXp.deleteMany({ where: { usuarioId: { in: usuarios } } });
+    await prisma.eventoMissao.deleteMany({ where: { periodo: { usuarioId: { in: usuarios } } } });
+    await prisma.missaoUsuario.deleteMany({ where: { periodo: { usuarioId: { in: usuarios } } } });
+    await prisma.periodoMissoes.deleteMany({ where: { usuarioId: { in: usuarios } } });
+    await prisma.resolucaoQuestao.deleteMany({ where: { usuarioId: { in: usuarios } } });
+    await prisma.tentativaQuiz.deleteMany({ where: { usuarioId: { in: usuarios } } });
+    await prisma.questao.deleteMany({ where: { criadoPorId: "professor", tema: { nome: "Tema de teste" } } });
+    await prisma.tema.deleteMany({ where: { nome: "Tema de teste" } });
     await prisma.$disconnect();
   });
 
@@ -36,11 +46,11 @@ suite("missões diárias no PostgreSQL", () => {
     );
     const semToken = await request(aplicacao)
       .get("/api/v1/missoes/minhas")
-      .set("x-internal-token", "test-internal-token");
+      .set("x-internal-token", process.env.INTERNAL_TOKEN!);
     expect(semToken.status).toBe(401);
     const resposta = await request(aplicacao)
       .get("/api/v1/missoes/minhas?usuarioId=outro")
-      .set("x-internal-token", "test-internal-token")
+      .set("x-internal-token", process.env.INTERNAL_TOKEN!)
       .set("x-user-id", "outro")
       .set("Authorization", `Bearer ${token}`);
     expect(resposta.status).toBe(200);
@@ -51,7 +61,7 @@ suite("missões diárias no PostgreSQL", () => {
     );
     const negado = await request(aplicacao)
       .get("/api/v1/missoes/minhas")
-      .set("x-internal-token", "test-internal-token")
+      .set("x-internal-token", process.env.INTERNAL_TOKEN!)
       .set("Authorization", `Bearer ${professor}`);
     expect(negado.status).toBe(403);
     expect(await prisma.periodoMissoes.count({ where: { usuarioId: "professor-84" } })).toBe(0);

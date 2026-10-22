@@ -52,6 +52,12 @@ describe("Testes de Integração - Loja", () => {
 
   afterAll(async () => {
     await limparBanco();
+    const temas = await prisma.tema.findMany({ where: { nome: "Anatomia - fluxo loja" }, select: { id: true } });
+    const temaIds = temas.map((tema) => tema.id);
+    await prisma.conquista.deleteMany({ where: { temaId: { in: temaIds } } });
+    await prisma.resolucaoQuestao.deleteMany({ where: { questao: { temaId: { in: temaIds } } } });
+    await prisma.questao.deleteMany({ where: { temaId: { in: temaIds } } });
+    await prisma.tema.deleteMany({ where: { id: { in: temaIds } } });
     await prisma.$disconnect();
   });
 
