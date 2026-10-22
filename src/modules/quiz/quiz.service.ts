@@ -124,8 +124,15 @@ export class QuizService {
       await this.validarRespostaDaRodada(data.tentativaId, id_usuario, data.questaoId);
     }
 
-    // Registra a tentativa (compoe o historico do aluno).
-    const tentativa_registrada = await this.quizRepository.registrarTentativa(data, id_usuario);
+    const correcao = gabarito.respostaCorreta === data.respostaMarcada;
+    const alunoPodeReceberRecompensas = papel_usuario === PAPEIS.ALUNO;
+
+    // Resposta e progresso da missão são gravados na mesma transação.
+    const tentativa_registrada = await this.quizRepository.registrarTentativa(
+      data,
+      id_usuario,
+      alunoPodeReceberRecompensas ? correcao : undefined,
+    );
 
     if (!tentativa_registrada) {
       throw new ErroAplicacao({
@@ -136,9 +143,6 @@ export class QuizService {
     }
 
     // Correcao = alternativa marcada igual ao gabarito. So aluno ganha recompensas.
-    const correcao = gabarito.respostaCorreta === data.respostaMarcada;
-    const alunoPodeReceberRecompensas = papel_usuario === PAPEIS.ALUNO;
-
     // Conquistas so sao processadas para alunos (professor/admin nao pontuam).
     const conquistas = alunoPodeReceberRecompensas
       ? await this.conquistaService.processarRespostaQuestao(
@@ -193,6 +197,7 @@ export class QuizService {
       moedasConcedidas,
       moedasJaConcedidas,
       conquistasDesbloqueadas: conquistas,
+      missoesConcluidas: tentativa_registrada.missoesConcluidas ?? [],
       potencializadorAplicado,
     };
   }

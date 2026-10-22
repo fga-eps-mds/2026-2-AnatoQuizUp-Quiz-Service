@@ -10,6 +10,7 @@ export type FeedbackQuizDto = {
   saldoMoedas: number;
   moedasConcedidas: number;
   moedasJaConcedidas: boolean;
+  missoesConcluidas?: { nome: string; recompensaXp: number }[];
   conquistasDesbloqueadas: ConquistaDesbloqueadaDto[];
   potencializadorAplicado: {
     nome: string;
