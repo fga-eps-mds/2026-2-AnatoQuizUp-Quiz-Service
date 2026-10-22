@@ -50,6 +50,7 @@ enum StatusTentativaQuiz {
 
 enum OrigemXp {
   QUIZ_CONCLUIDO
+  MISSAO_CONCLUIDA
 }
 
 enum StatusResolucaoLista {
@@ -254,6 +255,7 @@ model TransacaoXp {
 
   usuarioId   String
   tentativaId String? @unique
+  missaoUsuarioId String? @unique
 
   origem OrigemXp @default(QUIZ_CONCLUIDO)
 
@@ -267,6 +269,7 @@ model TransacaoXp {
 
   progresso ProgressoXp    @relation(fields: [usuarioId], references: [usuarioId], onDelete: Restrict)
   tentativa TentativaQuiz? @relation(fields: [tentativaId], references: [id], onDelete: Restrict)
+  missaoUsuario MissaoUsuario? @relation(fields: [missaoUsuarioId], references: [id], onDelete: Restrict)
 
   criadoEm DateTime @default(now())
 
@@ -621,4 +624,65 @@ model RecompensaItemConquista {
   @@unique([conquistaId, tier])
   @@index([itemLojaId])
   @@map("recompensas_itens_conquistas")
+}
+
+
+enum TipoMissao {
+  RESPONDER_QUESTOES
+  ACERTAR_QUESTOES
+  CONCLUIR_QUIZZES
+}
+
+enum PeriodicidadeMissao {
+  DIARIA
+  SEMANAL
+}
+
+model MissaoCatalogo {
+  id String @id @default(cuid())
+  codigo String @unique
+  nome String
+  descricao String
+  tipo TipoMissao
+  periodicidade PeriodicidadeMissao @default(DIARIA)
+  meta Int
+  recompensaXp Int
+  ativa Boolean @default(true)
+  missoes MissaoUsuario[]
+  @@map("missoes_catalogo")
+}
+
+model PeriodoMissoes {
+  id String @id @default(cuid())
+  usuarioId String
+  periodicidade PeriodicidadeMissao @default(DIARIA)
+  inicio DateTime
+  fim DateTime
+  missoes MissaoUsuario[]
+  eventos EventoMissao[]
+  @@unique([usuarioId, periodicidade, inicio])
+  @@map("periodos_missoes")
+}
+
+model MissaoUsuario {
+  id String @id @default(cuid())
+  periodoId String
+  missaoId String
+  progresso Int @default(0)
+  concluidaEm DateTime?
+  periodo PeriodoMissoes @relation(fields: [periodoId], references: [id], onDelete: Restrict)
+  missao MissaoCatalogo @relation(fields: [missaoId], references: [id], onDelete: Restrict)
+  transacaoXp TransacaoXp?
+  @@unique([periodoId, missaoId])
+  @@map("missoes_usuario")
+}
+
+model EventoMissao {
+  id String @id @default(cuid())
+  periodoId String
+  tipo String
+  chave String
+  periodo PeriodoMissoes @relation(fields: [periodoId], references: [id], onDelete: Restrict)
+  @@unique([periodoId, tipo, chave])
+  @@map("eventos_missao")
 }

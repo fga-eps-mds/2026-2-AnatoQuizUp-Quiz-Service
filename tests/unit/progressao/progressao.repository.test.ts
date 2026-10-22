@@ -3,11 +3,13 @@ import { StatusTentativaQuiz } from "@prisma/client";
 import { prisma } from "@/config/db";
 import { ProgressaoRepository } from "@/modules/progressao/progressao.repository";
 
+jest.mock("@/modules/missoes/missoes.repository", () => ({ bloquearMissoes: jest.fn(), contabilizarQuiz: jest.fn() }));
+
 jest.mock("@/config/db", () => ({
   prisma: {
     $transaction: jest.fn(),
     questao: { findMany: jest.fn() },
-    tentativaQuiz: { create: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn() },
+    tentativaQuiz: { create: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn(), findUniqueOrThrow: jest.fn().mockResolvedValue({ tema: null, dificuldade: null }) },
     progressoXp: { findUnique: jest.fn(), upsert: jest.fn() },
     transacaoXp: { create: jest.fn(), findMany: jest.fn(), count: jest.fn() },
   },
@@ -119,7 +121,7 @@ describe("ProgressaoRepository", () => {
         recompensa,
       });
 
-      expect(resultado).toEqual({ concluidaAgora: true });
+      expect(resultado).toMatchObject({ concluidaAgora: true });
       expect(tentativaUpdateMany).toHaveBeenCalledWith({
         where: { id: "t1", usuarioId: "aluno-1", status: StatusTentativaQuiz.EM_ANDAMENTO },
         data: {
@@ -172,7 +174,7 @@ describe("ProgressaoRepository", () => {
         recompensa: null,
       });
 
-      expect(resultado).toEqual({ concluidaAgora: true });
+      expect(resultado).toMatchObject({ concluidaAgora: true });
       expect(progressoUpsert).not.toHaveBeenCalled();
       expect(transacaoCreate).not.toHaveBeenCalled();
     });

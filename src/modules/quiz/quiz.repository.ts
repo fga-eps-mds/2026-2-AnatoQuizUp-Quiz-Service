@@ -1,3 +1,4 @@
+import { bloquearMissoes, contabilizarResposta } from "@/modules/missoes/missoes.repository";
 import type {
   FiltroListarQuestoesQueryDto,
   RegistroQuestaoCompleta,
@@ -93,15 +94,39 @@ export class QuizRepository {
    * @returns A resolucao criada.
    * @throws ErroAplicacao 409 se a questao ja foi respondida nesta rodada.
    */
-  async registrarTentativa(data: ResponderQuestaoQuizDto, usuarioId: string) {
+  async registrarTentativa(data: ResponderQuestaoQuizDto, usuarioId: string, correta?: boolean) {
     try {
-      return await prisma.resolucaoQuestao.create({
-        data: {
-          respostaMarcada: data.respostaMarcada,
-          questaoId: data.questaoId,
-          usuarioId: usuarioId,
-          ...(data.tentativaId && { tentativaId: data.tentativaId }),
-        },
+      if (correta === undefined) {
+        const resolucao = await prisma.resolucaoQuestao.create({
+          data: {
+            respostaMarcada: data.respostaMarcada,
+            questaoId: data.questaoId,
+            usuarioId,
+            ...(data.tentativaId && { tentativaId: data.tentativaId }),
+          },
+        });
+        return { ...resolucao, missoesConcluidas: [] };
+      }
+      return await prisma.$transaction(async (tx) => {
+        if (correta !== undefined) await bloquearMissoes(tx, usuarioId);
+        const agora = new Date();
+        const resolucao = await tx.resolucaoQuestao.create({
+          data: {
+            respostaMarcada: data.respostaMarcada,
+            questaoId: data.questaoId,
+            usuarioId: usuarioId,
+            ...(data.tentativaId && { tentativaId: data.tentativaId }),
+            criadoEm: agora,
+          },
+        });
+        const missoesConcluidas = await contabilizarResposta(
+          tx,
+          usuarioId,
+          data.questaoId,
+          correta,
+          agora,
+        );
+        return { ...resolucao, missoesConcluidas };
       });
     } catch (error) {
       // Duas requisicoes simultaneas para a mesma questao da rodada: a segunda cai aqui.

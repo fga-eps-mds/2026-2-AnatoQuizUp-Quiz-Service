@@ -39,6 +39,7 @@ export type ProgressoNivelDto = {
 // Resposta de POST /quiz/tentativas/:id/concluir.
 // jaConcluida = true indica repeticao da chamada (nenhum XP novo foi creditado).
 export type ResultadoTentativaDto = {
+  missoesConcluidas?: { nome: string; recompensaXp: number }[];
   tentativaId: string;
   tema: string | null;
   dificuldade: Dificuldade | null;
@@ -56,6 +57,7 @@ export type HistoricoXpItemDto = {
   id: string;
   data: string;
   origem: OrigemXp;
+  missao: { codigo: string; nome: string } | null;
   quiz: {
     tentativaId: string;
     tema: string | null;
