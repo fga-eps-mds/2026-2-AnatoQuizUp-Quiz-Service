@@ -1,10 +1,11 @@
-import { StatusTentativaQuiz } from "@prisma/client";
+import { EloXp, StatusTentativaQuiz } from "@prisma/client";
 import type { Dificuldade, Prisma } from "@prisma/client";
 
 import { prisma } from "@/config/db";
 import type { RegistroQuestaoCompleta } from "@/modules/questoes/dto/question.types";
 import type { ParametrosPaginacao } from "@/shared/utils/paginacao.util";
 
+import { calcularFaixaEloPorXp, resolverFaixaElo } from "./progressao.regras";
 import type { IniciarTentativaDto, RecompensaXpDto } from "./progressao.types";
 
 // Repository da progressao (Prisma): rodadas de quiz, XP acumulado e historico de XP.
@@ -50,6 +51,11 @@ type ConcluirTentativaParams = {
   usuarioId: string;
   totalAcertos: number;
   recompensa: RecompensaXpDto | null;
+};
+
+export type DadosProgressoBanco = {
+  xpTotal: number;
+  maiorElo: EloXp;
 };
 
 export class ProgressaoRepository {
@@ -134,6 +140,7 @@ export class ProgressaoRepository {
    * A troca de status so acontece se a rodada ainda estiver EM_ANDAMENTO; se
    * outra requisicao ja a concluiu, nada e creditado (concluidaAgora = false).
    * A chave unica de tentativaId em transacoes_xp e a segunda barreira.
+   * Tambem atualiza `maiorElo` caso o novo XP alcance uma faixa superior.
    *
    * @param params Rodada, acertos e recompensa calculada.
    * @returns Se a rodada foi concluida por esta chamada.
@@ -157,12 +164,25 @@ export class ProgressaoRepository {
       }
 
       if (recompensa) {
+        const eloInicial = calcularFaixaEloPorXp(recompensa.xpTotalRecebido).codigo;
         const progresso = await tx.progressoXp.upsert({
           where: { usuarioId },
-          create: { usuarioId, xpTotal: recompensa.xpTotalRecebido },
+          create: {
+            usuarioId,
+            xpTotal: recompensa.xpTotalRecebido,
+            maiorElo: eloInicial,
+          },
           update: { xpTotal: { increment: recompensa.xpTotalRecebido } },
-          select: { xpTotal: true },
+          select: { xpTotal: true, maiorElo: true },
         });
+
+        const eloEfetivo = resolverFaixaElo(progresso.xpTotal, progresso.maiorElo);
+        if (eloEfetivo.codigo !== progresso.maiorElo) {
+          await tx.progressoXp.update({
+            where: { usuarioId },
+            data: { maiorElo: eloEfetivo.codigo },
+          });
+        }
 
         await tx.transacaoXp.create({
           data: {
@@ -194,6 +214,24 @@ export class ProgressaoRepository {
     });
 
     return progresso?.xpTotal ?? 0;
+  }
+
+  /**
+   * XP acumulado e maior elo ja conquistado pelo usuario.
+   *
+   * @param usuarioId Id do usuario.
+   * @returns XP total e maiorElo (padrao 0 e CURIOSO se ainda nao houver registro).
+   */
+  async buscarDadosProgresso(usuarioId: string): Promise<DadosProgressoBanco> {
+    const progresso = await prisma.progressoXp.findUnique({
+      where: { usuarioId },
+      select: { xpTotal: true, maiorElo: true },
+    });
+
+    return {
+      xpTotal: progresso?.xpTotal ?? 0,
+      maiorElo: progresso?.maiorElo ?? EloXp.CURIOSO,
+    };
   }
 
   /**

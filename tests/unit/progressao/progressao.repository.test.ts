@@ -1,4 +1,4 @@
-import { StatusTentativaQuiz } from "@prisma/client";
+import { EloXp, StatusTentativaQuiz } from "@prisma/client";
 
 import { prisma } from "@/config/db";
 import { ProgressaoRepository } from "@/modules/progressao/progressao.repository";
@@ -8,7 +8,7 @@ jest.mock("@/config/db", () => ({
     $transaction: jest.fn(),
     questao: { findMany: jest.fn() },
     tentativaQuiz: { create: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn() },
-    progressoXp: { findUnique: jest.fn(), upsert: jest.fn() },
+    progressoXp: { findUnique: jest.fn(), upsert: jest.fn(), update: jest.fn() },
     transacaoXp: { create: jest.fn(), findMany: jest.fn(), count: jest.fn() },
   },
 }));
@@ -20,6 +20,7 @@ const tentativaFindFirst = prisma.tentativaQuiz.findFirst as jest.Mock;
 const tentativaUpdateMany = prisma.tentativaQuiz.updateMany as jest.Mock;
 const progressoFindUnique = prisma.progressoXp.findUnique as jest.Mock;
 const progressoUpsert = prisma.progressoXp.upsert as jest.Mock;
+const progressoUpdate = prisma.progressoXp.update as jest.Mock;
 const transacaoCreate = prisma.transacaoXp.create as jest.Mock;
 const transacaoFindMany = prisma.transacaoXp.findMany as jest.Mock;
 const transacaoCount = prisma.transacaoXp.count as jest.Mock;
@@ -110,7 +111,7 @@ describe("ProgressaoRepository", () => {
 
     it("fecha a rodada, soma o XP e registra a transacao com o acumulado", async () => {
       tentativaUpdateMany.mockResolvedValue({ count: 1 });
-      progressoUpsert.mockResolvedValue({ xpTotal: 135 });
+      progressoUpsert.mockResolvedValue({ xpTotal: 135, maiorElo: EloXp.CURIOSO });
 
       const resultado = await repository.concluirTentativa({
         tentativaId: "t1",
@@ -130,10 +131,11 @@ describe("ProgressaoRepository", () => {
       });
       expect(progressoUpsert).toHaveBeenCalledWith({
         where: { usuarioId: "aluno-1" },
-        create: { usuarioId: "aluno-1", xpTotal: 35 },
+        create: { usuarioId: "aluno-1", xpTotal: 35, maiorElo: EloXp.CURIOSO },
         update: { xpTotal: { increment: 35 } },
-        select: { xpTotal: true },
+        select: { xpTotal: true, maiorElo: true },
       });
+      expect(progressoUpdate).not.toHaveBeenCalled();
       expect(transacaoCreate).toHaveBeenCalledWith({
         data: {
           usuarioId: "aluno-1",
@@ -144,6 +146,23 @@ describe("ProgressaoRepository", () => {
           quantidade: 35,
           xpTotalApos: 135,
         },
+      });
+    });
+
+    it("atualiza maiorElo quando o XP acumulado atinge uma nova faixa de elo", async () => {
+      tentativaUpdateMany.mockResolvedValue({ count: 1 });
+      progressoUpsert.mockResolvedValue({ xpTotal: 520, maiorElo: EloXp.CURIOSO });
+
+      await repository.concluirTentativa({
+        tentativaId: "t1",
+        usuarioId: "aluno-1",
+        totalAcertos: 3,
+        recompensa,
+      });
+
+      expect(progressoUpdate).toHaveBeenCalledWith({
+        where: { usuarioId: "aluno-1" },
+        data: { maiorElo: EloXp.ACADEMICO },
       });
     });
 
@@ -183,6 +202,21 @@ describe("ProgressaoRepository", () => {
 
     await expect(repository.buscarXpTotal("aluno-1")).resolves.toBe(240);
     await expect(repository.buscarXpTotal("aluno-2")).resolves.toBe(0);
+  });
+
+  it("devolve os dados de progresso (xpTotal e maiorElo) ou valores padrao", async () => {
+    progressoFindUnique
+      .mockResolvedValueOnce({ xpTotal: 1500, maiorElo: EloXp.INTERNO })
+      .mockResolvedValueOnce(null);
+
+    await expect(repository.buscarDadosProgresso("aluno-1")).resolves.toEqual({
+      xpTotal: 1500,
+      maiorElo: EloXp.INTERNO,
+    });
+    await expect(repository.buscarDadosProgresso("aluno-2")).resolves.toEqual({
+      xpTotal: 0,
+      maiorElo: EloXp.CURIOSO,
+    });
   });
 
   it("lista o historico de XP paginado, mais recente primeiro", async () => {
