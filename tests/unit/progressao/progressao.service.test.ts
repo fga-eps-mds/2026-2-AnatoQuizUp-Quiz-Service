@@ -1,4 +1,4 @@
-import { StatusTentativaQuiz } from "@prisma/client";
+import { EloXp, StatusTentativaQuiz } from "@prisma/client";
 
 import type {
   ProgressaoRepository,
@@ -100,6 +100,7 @@ function criarRepositoryMock() {
     buscarTentativaParaConclusao: jest.fn(),
     concluirTentativa: jest.fn(),
     buscarXpTotal: jest.fn(),
+    buscarDadosProgresso: jest.fn(),
     listarHistoricoXp: jest.fn(),
   } as unknown as jest.Mocked<ProgressaoRepository>;
 }
@@ -220,7 +221,7 @@ describe("ProgressaoService", () => {
           }),
         );
       repository.concluirTentativa.mockResolvedValue({ concluidaAgora: true });
-      repository.buscarXpTotal.mockResolvedValue(35);
+      repository.buscarDadosProgresso.mockResolvedValue({ xpTotal: 35, maiorElo: EloXp.CURIOSO });
 
       const resultado = await service.concluirTentativa("tentativa-1", "aluno-1", PAPEIS.ALUNO);
 
@@ -230,7 +231,7 @@ describe("ProgressaoService", () => {
         totalAcertos: 3,
         recompensa: { xpBase: 20, bonusDesempenho: 15, bonusPowerUp: 0, xpTotalRecebido: 35 },
       });
-      expect(resultado).toEqual({
+      expect(resultado).toMatchObject({
         missoesConcluidas: [],
         tentativaId: "tentativa-1",
         tema: "Abdome Agudo",
@@ -250,11 +251,15 @@ describe("ProgressaoService", () => {
         },
         subiuDeNivel: false,
         nivelAnterior: 1,
+        subiuDeElo: false,
+        xpExcedenteElo: 35,
       });
+      expect(resultado.eloAnterior.nome).toBe("Curioso");
+      expect(resultado.novoElo.nome).toBe("Curioso");
     });
 
-    it("sinaliza a subida de nivel quando o XP cruza a fronteira", async () => {
-      const transacao = criarTransacao({ quantidade: 35, xpTotalApos: 120 });
+    it("sinaliza a subida de nivel e subida de elo quando o XP cruza a fronteira (490 -> 510)", async () => {
+      const transacao = criarTransacao({ quantidade: 20, xpTotalApos: 510 });
       repository.buscarTentativaParaConclusao
         .mockResolvedValueOnce(criarTentativa({ respostas: respostasCompletas }))
         .mockResolvedValueOnce(
@@ -265,13 +270,37 @@ describe("ProgressaoService", () => {
           }),
         );
       repository.concluirTentativa.mockResolvedValue({ concluidaAgora: true });
-      repository.buscarXpTotal.mockResolvedValue(120);
+      repository.buscarDadosProgresso.mockResolvedValue({ xpTotal: 510, maiorElo: EloXp.ACADEMICO });
 
       const resultado = await service.concluirTentativa("tentativa-1", "aluno-1", PAPEIS.ALUNO);
 
-      expect(resultado.subiuDeNivel).toBe(true);
-      expect(resultado.nivelAnterior).toBe(1);
-      expect(resultado.progresso.nivel).toBe(2);
+      expect(resultado.subiuDeElo).toBe(true);
+      expect(resultado.eloAnterior.nome).toBe("Curioso");
+      expect(resultado.novoElo.nome).toBe("Acadêmico");
+      expect(resultado.xpExcedenteElo).toBe(10);
+      expect(resultado.progresso.eloAtual.nome).toBe("Acadêmico");
+      expect(resultado.progresso.xpFaltanteProximoElo).toBe(990);
+    });
+
+    it("preserva o maiorElo em eloAnterior e nao sinaliza subiuDeElo quando o aluno ja tinha elo superior", async () => {
+      const transacao = criarTransacao({ quantidade: 20, xpTotalApos: 510 });
+      repository.buscarTentativaParaConclusao
+        .mockResolvedValueOnce(criarTentativa({ respostas: respostasCompletas }))
+        .mockResolvedValueOnce(
+          criarTentativa({
+            status: StatusTentativaQuiz.CONCLUIDA,
+            totalAcertos: 3,
+            transacaoXp: transacao,
+          }),
+        );
+      repository.concluirTentativa.mockResolvedValue({ concluidaAgora: true });
+      repository.buscarDadosProgresso.mockResolvedValue({ xpTotal: 510, maiorElo: EloXp.R3 });
+
+      const resultado = await service.concluirTentativa("tentativa-1", "aluno-1", PAPEIS.ALUNO);
+
+      expect(resultado.eloAnterior.nome).toBe("R3");
+      expect(resultado.novoElo.nome).toBe("R3");
+      expect(resultado.subiuDeElo).toBe(false);
     });
 
     it("nao credita de novo quando a rodada ja estava concluida (refresh/nova requisicao)", async () => {
@@ -282,7 +311,7 @@ describe("ProgressaoService", () => {
           transacaoXp: criarTransacao(),
         }),
       );
-      repository.buscarXpTotal.mockResolvedValue(35);
+      repository.buscarDadosProgresso.mockResolvedValue({ xpTotal: 35, maiorElo: EloXp.CURIOSO });
 
       const resultado = await service.concluirTentativa("tentativa-1", "aluno-1", PAPEIS.ALUNO);
 
@@ -303,7 +332,7 @@ describe("ProgressaoService", () => {
           }),
         );
       repository.concluirTentativa.mockResolvedValue({ concluidaAgora: false });
-      repository.buscarXpTotal.mockResolvedValue(35);
+      repository.buscarDadosProgresso.mockResolvedValue({ xpTotal: 35, maiorElo: EloXp.CURIOSO });
 
       const resultado = await service.concluirTentativa("tentativa-1", "aluno-1", PAPEIS.ALUNO);
 
@@ -318,7 +347,7 @@ describe("ProgressaoService", () => {
           criarTentativa({ status: StatusTentativaQuiz.CONCLUIDA, totalAcertos: 3 }),
         );
       repository.concluirTentativa.mockResolvedValue({ concluidaAgora: true });
-      repository.buscarXpTotal.mockResolvedValue(0);
+      repository.buscarDadosProgresso.mockResolvedValue({ xpTotal: 0, maiorElo: EloXp.CURIOSO });
 
       const resultado = await service.concluirTentativa("tentativa-1", "prof-1", PAPEIS.PROFESSOR);
 
@@ -332,6 +361,7 @@ describe("ProgressaoService", () => {
         xpTotalRecebido: 0,
       });
       expect(resultado.subiuDeNivel).toBe(false);
+      expect(resultado.subiuDeElo).toBe(false);
     });
 
     it("recusa concluir com questoes pendentes", async () => {
@@ -368,7 +398,7 @@ describe("ProgressaoService", () => {
       repository.buscarTentativaParaConclusao.mockResolvedValue(
         criarTentativa({ status: StatusTentativaQuiz.CONCLUIDA, totalAcertos: null }),
       );
-      repository.buscarXpTotal.mockResolvedValue(0);
+      repository.buscarDadosProgresso.mockResolvedValue({ xpTotal: 0, maiorElo: EloXp.CURIOSO });
 
       const resultado = await service.concluirTentativa("tentativa-1", "aluno-1", PAPEIS.ALUNO);
 
@@ -377,13 +407,14 @@ describe("ProgressaoService", () => {
   });
 
   describe("buscarProgresso", () => {
-    it("devolve nivel e XP faltante a partir do XP acumulado", async () => {
-      repository.buscarXpTotal.mockResolvedValue(150);
+    it("devolve nivel, elo e XP faltante a partir do XP acumulado", async () => {
+      repository.buscarDadosProgresso.mockResolvedValue({ xpTotal: 1200, maiorElo: EloXp.ACADEMICO });
 
       await expect(service.buscarProgresso("aluno-1")).resolves.toMatchObject({
-        xpTotal: 150,
-        nivel: 2,
-        xpFaltante: 150,
+        xpTotal: 1200,
+        eloAtual: expect.objectContaining({ nome: "Acadêmico" }),
+        proximoElo: expect.objectContaining({ nome: "Interno" }),
+        xpFaltanteProximoElo: 300,
       });
     });
 

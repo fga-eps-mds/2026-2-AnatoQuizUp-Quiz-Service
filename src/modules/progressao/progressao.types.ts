@@ -1,8 +1,8 @@
-import type { Dificuldade, OrigemXp } from "@prisma/client";
+import type { Dificuldade, EloXp, OrigemXp } from "@prisma/client";
 
 import type { RespostaQuestaoQuizDto } from "@/modules/quiz/dto/responses/resposta_questao_quiz_dto";
 
-// Contratos do modulo de progressao (rodadas de quiz, XP e nivel).
+// Contratos do modulo de progressao (rodadas de quiz, XP, nivel e elo).
 
 // Body de POST /quiz/tentativas: filtros da rodada (iguais aos da tela de escolha).
 export type IniciarTentativaDto = {
@@ -25,7 +25,35 @@ export type RecompensaXpDto = {
   xpTotalRecebido: number;
 };
 
-// Nivel atual e progresso ate o proximo (alimenta a barra de progresso).
+// Definicao de uma faixa de elo da plataforma.
+export type FaixaEloDto = {
+  codigo: EloXp;
+  nome: string;
+  ordem: number;
+  xpMinimo: number;
+  xpMaximo: number | null;
+  objetivo: string;
+};
+
+// Estado de um elo na jornada do estudante (Tela "Todos os elos").
+export type StatusFaixaElo =
+  | "CONQUISTADO"
+  | "ELO_ATUAL"
+  | "PROXIMO_ELO"
+  | "BLOQUEADO"
+  | "ELO_MAXIMO";
+
+// Item da lista completa de elos com o progresso do estudante na faixa.
+export type EloJornadaDto = FaixaEloDto & {
+  status: StatusFaixaElo;
+  conquistado: boolean;
+  ehAtual: boolean;
+  percentual: number;
+  xpFaltante: number;
+  eloAnteriorNome: string | null;
+};
+
+// Nivel/elo atual e progresso ate o proximo (alimenta a barra de progresso e telas de elo).
 export type ProgressoNivelDto = {
   xpTotal: number;
   nivel: number;
@@ -34,6 +62,14 @@ export type ProgressoNivelDto = {
   xpNecessarioNoNivel: number;
   xpFaltante: number;
   percentual: number;
+  eloAtual: FaixaEloDto;
+  maiorElo: FaixaEloDto;
+  proximoElo: FaixaEloDto | null;
+  xpNoElo: number;
+  xpNecessarioNoElo: number | null;
+  xpFaltanteProximoElo: number;
+  percentualElo: number;
+  todosOsElos: EloJornadaDto[];
 };
 
 // Resposta de POST /quiz/tentativas/:id/concluir.
@@ -50,6 +86,10 @@ export type ResultadoTentativaDto = {
   progresso: ProgressoNivelDto;
   subiuDeNivel: boolean;
   nivelAnterior: number;
+  subiuDeElo: boolean;
+  eloAnterior: FaixaEloDto;
+  novoElo: FaixaEloDto;
+  xpExcedenteElo: number;
 };
 
 // Linha do historico de XP: data, origem, quiz relacionado e valor.

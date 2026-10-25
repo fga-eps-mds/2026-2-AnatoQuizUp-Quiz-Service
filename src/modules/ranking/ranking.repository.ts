@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, type EloXp } from '@prisma/client';
 
 import { prisma } from '@/config/db';
 
@@ -8,14 +8,15 @@ export interface LinhaPontuacao {
   respondidas: bigint;
   ultimaAtividade: Date | null;
   xpTotal: number | bigint | null;
+  maiorElo?: EloXp | null;
 }
 
 export class RankingRepository {
   /**
    * Agrega o desempenho de cada usuário a partir das resoluções de questões
-   * e junta o XP acumulado (0 para quem ainda não concluiu nenhuma rodada de
-   * quiz). Quando `usuarioIds` é informado, restringe o cálculo a esses
-   * usuários (usado pelo ranking de amigos); caso contrário, considera todos
+   * e junta o XP acumulado e o maior elo (0 / CURIOSO para quem ainda não concluiu
+   * nenhuma rodada de quiz). Quando `usuarioIds` é informado, restringe o cálculo
+   * a esses usuários (usado pelo ranking de amigos); caso contrário, considera todos
    * os participantes (ranking geral).
    *
    * O cálculo é feito em uma única query agregada para evitar carregar todas
@@ -33,7 +34,8 @@ export class RankingRepository {
         COUNT(*) FILTER (WHERE r."respostaMarcada" = q."respostaCorreta") AS "acertos",
         COUNT(*) AS "respondidas",
         MAX(r."criadoEm") AS "ultimaAtividade",
-        COALESCE(MAX(p."xpTotal"), 0) AS "xpTotal"
+        COALESCE(MAX(p."xpTotal"), 0) AS "xpTotal",
+        MAX(p."maiorElo") AS "maiorElo"
       FROM "resolucoes_questoes" r
       JOIN "questoes" q ON q."id" = r."questaoId"
       LEFT JOIN "progressos_xp" p ON p."usuarioId" = r."usuarioId"

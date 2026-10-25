@@ -14,7 +14,12 @@ import {
 } from "@/shared/utils/paginacao.util";
 
 import { LIMITE_QUESTOES_POR_RODADA } from "./progressao.constants";
-import { calcularNivel, calcularRecompensaXp, montarProgressoNivel } from "./progressao.regras";
+import {
+  calcularFaixaEloPorXp,
+  calcularNivel,
+  calcularRecompensaXp,
+  montarProgressoNivel,
+} from "./progressao.regras";
 import type { ProgressaoRepository, TentativaParaConclusao } from "./progressao.repository";
 import type {
   HistoricoXpItemDto,
@@ -37,7 +42,7 @@ const RECOMPENSA_ZERADA: RecompensaXpDto = {
  * Service da progressao do aluno.
  *
  * Controla as rodadas de quiz (inicio e conclusao), concede XP ao concluir e
- * expoe o nivel atual e o historico de XP.
+ * expoe o nivel atual, o elo atual e o historico de XP.
  */
 export class ProgressaoService {
   constructor(private readonly repository: ProgressaoRepository) {}
@@ -103,7 +108,7 @@ export class ProgressaoService {
    * @param tentativaId Id da rodada.
    * @param usuarioId Usuario autenticado.
    * @param papel Papel do usuario.
-   * @returns Recompensa, XP acumulado, nivel e se houve subida de nivel.
+   * @returns Recompensa, XP acumulado, nivel/elo e se houve subida de nivel ou elo.
    * @throws ErroAplicacao 401 sem usuario; 404 rodada inexistente; 409 rodada incompleta.
    */
   async concluirTentativa(
@@ -161,17 +166,17 @@ export class ProgressaoService {
   }
 
   /**
-   * Nivel atual e progresso ate o proximo nivel do usuario.
+   * Nivel e elo atuais e progresso ate o proximo nivel/elo do usuario.
    *
    * @param usuarioId Usuario autenticado.
-   * @returns XP acumulado, nivel e XP faltante.
+   * @returns XP acumulado, nivel, elo e XP faltante.
    */
   async buscarProgresso(usuarioId: string): Promise<ProgressoNivelDto> {
     this.exigirUsuario(usuarioId);
 
-    const xpTotal = await this.repository.buscarXpTotal(usuarioId);
+    const { xpTotal, maiorElo } = await this.repository.buscarDadosProgresso(usuarioId);
 
-    return montarProgressoNivel(xpTotal);
+    return montarProgressoNivel(xpTotal, maiorElo);
   }
 
   /**
@@ -219,7 +224,9 @@ export class ProgressaoService {
     jaConcluida: boolean,
   ): Promise<ResultadoTentativaDto> {
     const transacao = tentativa.transacaoXp;
-    const xpTotalAtual = await this.repository.buscarXpTotal(tentativa.usuarioId);
+    const { xpTotal: xpTotalAtual, maiorElo } = await this.repository.buscarDadosProgresso(
+      tentativa.usuarioId,
+    );
 
     const recompensa: RecompensaXpDto = transacao
       ? {
@@ -230,10 +237,23 @@ export class ProgressaoService {
         }
       : RECOMPENSA_ZERADA;
 
-    // Nivel antes/depois desta rodada, reconstruido pelo XP acumulado da epoca.
+    // Nivel e elo antes/depois desta rodada, reconstruidos pelo XP acumulado da epoca
+    // e respeitando a regra de nao regressao caso o aluno ja tivesse um maiorElo superior.
     const xpApos = transacao ? transacao.xpTotalApos : xpTotalAtual;
-    const nivelAnterior = calcularNivel(xpApos - recompensa.xpTotalRecebido);
+    const xpAntes = Math.max(0, xpApos - recompensa.xpTotalRecebido);
+    const nivelAnterior = calcularNivel(xpAntes);
     const nivelApos = calcularNivel(xpApos);
+
+    const progresso = montarProgressoNivel(xpTotalAtual, maiorElo);
+    const progressoDaTentativa =
+      xpApos === xpTotalAtual ? progresso : montarProgressoNivel(xpApos, maiorElo);
+
+    const eloAposPeloXp = calcularFaixaEloPorXp(xpApos);
+    const novoElo = progressoDaTentativa.eloAtual;
+    const eloAnterior =
+      novoElo.ordem > eloAposPeloXp.ordem ? novoElo : calcularFaixaEloPorXp(xpAntes);
+    const subiuDeElo = novoElo.ordem > eloAnterior.ordem;
+    const xpExcedenteElo = progressoDaTentativa.xpNoElo;
 
     return {
       tentativaId: tentativa.id,
@@ -243,9 +263,13 @@ export class ProgressaoService {
       totalAcertos: tentativa.totalAcertos ?? 0,
       jaConcluida,
       recompensa,
-      progresso: montarProgressoNivel(xpTotalAtual),
+      progresso,
       subiuDeNivel: nivelApos > nivelAnterior,
       nivelAnterior,
+      subiuDeElo,
+      eloAnterior,
+      novoElo,
+      xpExcedenteElo,
     };
   }
 
