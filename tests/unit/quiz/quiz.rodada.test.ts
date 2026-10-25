@@ -146,7 +146,7 @@ describe("Quiz - resposta dentro de uma rodada", () => {
         "aluno-1",
         "q1",
       );
-      expect(repository.registrarTentativa).toHaveBeenCalledWith(respostaNaRodada, "aluno-1");
+      expect(repository.registrarTentativa).toHaveBeenCalledWith(respostaNaRodada, "aluno-1", true);
       expect(feedback.correcao).toBe(true);
     });
 

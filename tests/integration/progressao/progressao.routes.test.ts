@@ -36,6 +36,9 @@ describe("Testes de Integração - Progressão (rodada de quiz e XP)", () => {
     // Ordem estrita para evitar violação de chaves estrangeiras
     await prisma.transacaoXp.deleteMany();
     await prisma.progressoXp.deleteMany();
+    await prisma.eventoMissao.deleteMany();
+    await prisma.missaoUsuario.deleteMany();
+    await prisma.periodoMissoes.deleteMany();
     await prisma.transacaoMoeda.deleteMany();
     await prisma.resolucaoQuestao.deleteMany();
     await prisma.tentativaQuiz.deleteMany();

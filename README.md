@@ -101,3 +101,21 @@ make lint
 make test
 make build
 ```
+
+### Missões diárias
+
+O catálogo inicial é instalado pela migração de missões. Cada aluno recebe três
+missões aleatórias, sem repetição, na primeira consulta ou atividade do período.
+A renovação ocorre à meia-noite em `America/Sao_Paulo`. Respostas de quiz são
+contadas apenas na primeira resposta à questão no dia; rodadas são deduplicadas
+pela combinação de tema e dificuldade (filtro ausente é uma combinação própria).
+
+`GET /api/v1/missoes/minhas` consulta o período atual do aluno autenticado. O
+progresso e o XP são gravados no Quiz-Service junto com a atividade; o histórico
+existente de XP identifica a missão pela origem `MISSAO_CONCLUIDA`. As respostas
+de atividade podem incluir `missoesConcluidas` para informar a recompensa.
+
+Os testes de integração em `tests/integration/missoes/missoes.database.test.ts`
+exigem um banco de teste PostgreSQL migrado. Defina `DATABASE_URL` e
+`MISSOES_DATABASE_TEST_URL` para esse banco antes de executá-los; sem a segunda
+variável, eles são ignorados. Nunca use um banco de produção para os testes.

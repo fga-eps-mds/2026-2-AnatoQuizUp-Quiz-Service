@@ -1,3 +1,4 @@
+import { bloquearMissoes, contabilizarQuiz } from "@/modules/missoes/missoes.repository";
 import { EloXp, StatusTentativaQuiz } from "@prisma/client";
 import type { Dificuldade, Prisma } from "@prisma/client";
 
@@ -29,6 +30,7 @@ export type TentativaParaConclusao = Prisma.TentativaQuizGetPayload<{
 
 // Linha do historico de XP com a rodada relacionada.
 const includeHistoricoXp = {
+  missaoUsuario: { select: { missao: { select: { codigo: true, nome: true } } } },
   tentativa: {
     select: {
       id: true,
@@ -145,15 +147,22 @@ export class ProgressaoRepository {
    * @param params Rodada, acertos e recompensa calculada.
    * @returns Se a rodada foi concluida por esta chamada.
    */
-  async concluirTentativa(params: ConcluirTentativaParams): Promise<{ concluidaAgora: boolean }> {
+  async concluirTentativa(
+    params: ConcluirTentativaParams,
+  ): Promise<{
+    concluidaAgora: boolean;
+    missoesConcluidas?: { nome: string; recompensaXp: number }[];
+  }> {
     const { tentativaId, usuarioId, totalAcertos, recompensa } = params;
 
     return await prisma.$transaction(async (tx) => {
+      if (recompensa) await bloquearMissoes(tx, usuarioId);
+      const agora = new Date();
       const atualizadas = await tx.tentativaQuiz.updateMany({
         where: { id: tentativaId, usuarioId, status: StatusTentativaQuiz.EM_ANDAMENTO },
         data: {
           status: StatusTentativaQuiz.CONCLUIDA,
-          concluidaEm: new Date(),
+          concluidaEm: agora,
           totalAcertos,
         },
       });
@@ -197,7 +206,21 @@ export class ProgressaoRepository {
         });
       }
 
-      return { concluidaAgora: true };
+      let missoesConcluidas: { nome: string; recompensaXp: number }[] = [];
+      if (recompensa) {
+        const tentativa = await tx.tentativaQuiz.findUniqueOrThrow({
+          where: { id: tentativaId },
+          select: { tema: true, dificuldade: true },
+        });
+        missoesConcluidas = await contabilizarQuiz(
+          tx,
+          usuarioId,
+          tentativa.tema,
+          tentativa.dificuldade,
+          agora,
+        );
+      }
+      return { concluidaAgora: true, missoesConcluidas };
     });
   }
 

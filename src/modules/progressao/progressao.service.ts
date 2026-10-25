@@ -148,7 +148,7 @@ export class ProgressaoService {
           )
         : null;
 
-    const { concluidaAgora } = await this.repository.concluirTentativa({
+    const { concluidaAgora, missoesConcluidas } = await this.repository.concluirTentativa({
       tentativaId,
       usuarioId,
       totalAcertos: acertos.length,
@@ -159,7 +159,10 @@ export class ProgressaoService {
     // a chamada que concluiu ou uma concorrente que chegou primeiro.
     const tentativaConcluida = await this.buscarTentativaOuFalhar(tentativaId, usuarioId);
 
-    return await this.montarResultado(tentativaConcluida, !concluidaAgora);
+    return {
+      ...(await this.montarResultado(tentativaConcluida, !concluidaAgora)),
+      missoesConcluidas: missoesConcluidas ?? [],
+    };
   }
 
   /**
@@ -196,6 +199,7 @@ export class ProgressaoService {
       id: transacao.id,
       data: transacao.criadoEm.toISOString(),
       origem: transacao.origem,
+      missao: transacao.missaoUsuario?.missao ?? null,
       quiz: transacao.tentativa
         ? {
             tentativaId: transacao.tentativa.id,

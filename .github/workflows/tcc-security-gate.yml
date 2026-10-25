@@ -37,6 +37,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anatoquizup_quiz_test?schema=public
       JWT_SECRET_KEY: ci-test-secret
       INTERNAL_TOKEN: ci-internal-token
+      MISSOES_DATABASE_TEST_URL: enabled
 
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -50,7 +51,7 @@ jobs:
 
       - run: npm ci
       - run: npm run prisma:generate
-      - run: npx prisma db push --skip-generate
+      - run: npx prisma migrate deploy
       - run: npm run test:ci
 
       - name: SonarCloud Scan

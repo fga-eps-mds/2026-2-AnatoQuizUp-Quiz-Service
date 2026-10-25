@@ -232,6 +232,7 @@ describe("ProgressaoService", () => {
         recompensa: { xpBase: 20, bonusDesempenho: 15, bonusPowerUp: 0, xpTotalRecebido: 35 },
       });
       expect(resultado).toMatchObject({
+        missoesConcluidas: [],
         tentativaId: "tentativa-1",
         tema: "Abdome Agudo",
         dificuldade: "FACIL",
@@ -453,6 +454,7 @@ describe("ProgressaoService", () => {
         id: "xp-1",
         data: "2026-10-09T12:00:00.000Z",
         origem: "QUIZ_CONCLUIDO",
+        missao: null,
         quiz: {
           tentativaId: "tentativa-1",
           tema: "Abdome Agudo",

@@ -13,6 +13,7 @@ import { ErroAplicacao } from "@/shared/errors/erro-aplicacao";
 import { middlewareAutenticacao } from "@/shared/middlewares/autenticacao.middleware";
 import { middlewareTokenInterno } from "@/shared/middlewares/token-interno.middleware";
 import { middlewareTratamentoErros } from "@/shared/middlewares/tratamento-erros.middleware";
+import { missoesRouter } from "@/modules/missoes/missoes.routes";
 import { quizRouter } from "@/modules/quiz/quiz.routes";
 import { listaQuestaoRouter } from "@/modules/lista";
 import { dashboardRouter } from "@/modules/dashboardTurma/dashboardTurma.routes";
@@ -52,6 +53,7 @@ aplicacao.use("/api", middlewareTokenInterno);
 // Roteador da API v1: autenticacao do usuario + montagem de cada modulo.
 roteadorApi.use(middlewareAutenticacao);
 roteadorApi.use("/quiz", quizRouter);
+roteadorApi.use("/missoes", missoesRouter);
 roteadorApi.use("/questoes", questionRouter);
 roteadorApi.use("/turmas", turmaRouter);
 roteadorApi.use("/lista", listaQuestaoRouter);
