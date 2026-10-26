@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { OrigemXp, TipoMissao, type Dificuldade, type Prisma } from "@prisma/client";
 import { prisma } from "@/config/db";
+import { creditarXp } from "@/modules/progressao/elo.repository";
 import { periodoDiario } from "./periodo";
 
 type Tx = Prisma.TransactionClient;
@@ -57,12 +58,11 @@ async function avancar(
       data: { progresso, ...(concluiu && { concluidaEm: agora }) },
     });
     if (concluiu) {
-      const saldo = await tx.progressoXp.upsert({
-        where: { usuarioId },
-        create: { usuarioId, xpTotal: item.missao.recompensaXp },
-        update: { xpTotal: { increment: item.missao.recompensaXp } },
-        select: { xpTotal: true },
-      });
+      // Mesmo caminho de credito da conclusao de rodada, para que o XP de elo e o
+      // XP total nunca divirjam (US #89). Passa atividadeValida = false: concluir uma
+      // missao (que pode disparar ao responder uma questao solta) nao e a "atividade
+      // valida" da US, so a conclusao de um quiz reinicia a contagem de inatividade.
+      const saldo = await creditarXp(tx, usuarioId, item.missao.recompensaXp, agora, false);
       concluidas.push({ nome: item.missao.nome, recompensaXp: item.missao.recompensaXp });
       await tx.transacaoXp.create({
         data: {
@@ -74,6 +74,7 @@ async function avancar(
           bonusPowerUp: 0,
           quantidade: item.missao.recompensaXp,
           xpTotalApos: saldo.xpTotal,
+          xpEloApos: saldo.xpElo,
         },
       });
     }

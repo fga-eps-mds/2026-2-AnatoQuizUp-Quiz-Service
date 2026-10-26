@@ -13,21 +13,37 @@ import {
   resolverParametrosPaginacao,
 } from "@/shared/utils/paginacao.util";
 
+import {
+  aplicarInatividade,
+  aplicarInatividadeEmLote,
+  buscarConfiguracao,
+  buscarConfiguracaoCompleta,
+  listarHistoricoElo,
+  listarNotificacoes,
+  marcarNotificacaoLida,
+  montarRetratoInatividade,
+  salvarConfiguracao,
+} from "./elo.repository";
 import { LIMITE_QUESTOES_POR_RODADA } from "./progressao.constants";
 import {
   calcularFaixaEloPorXp,
   calcularNivel,
   calcularRecompensaXp,
   montarProgressoNivel,
+  obterFaixaEloPorCodigo,
 } from "./progressao.regras";
 import type { ProgressaoRepository, TentativaParaConclusao } from "./progressao.repository";
 import type {
+  ConfiguracaoInatividadeDto,
+  EventoEloDto,
   HistoricoXpItemDto,
   HistoricoXpQueryDto,
   IniciarTentativaDto,
+  NotificacaoEloDto,
   ProgressoNivelDto,
   RecompensaXpDto,
   ResultadoTentativaDto,
+  ResultadoVerificacaoInatividadeDto,
   TentativaIniciadaDto,
 } from "./progressao.types";
 
@@ -166,17 +182,21 @@ export class ProgressaoService {
   }
 
   /**
-   * Nivel e elo atuais e progresso ate o proximo nivel/elo do usuario.
+   * Nivel, elo e estado de inatividade atuais do usuario.
+   *
+   * Antes de responder, aplica os rebaixamentos ja vencidos: e o que faz os cenarios
+   * "Quando sua progressao for consultada" valerem mesmo que a rotina em lote nao tenha
+   * rodado ainda.
    *
    * @param usuarioId Usuario autenticado.
-   * @returns XP acumulado, nivel, elo e XP faltante.
+   * @returns XP total, XP de elo, nivel, elo, estado e prazo de rebaixamento.
    */
   async buscarProgresso(usuarioId: string): Promise<ProgressoNivelDto> {
     this.exigirUsuario(usuarioId);
 
-    const { xpTotal, maiorElo } = await this.repository.buscarDadosProgresso(usuarioId);
+    const { dados, retrato } = await aplicarInatividade(usuarioId);
 
-    return montarProgressoNivel(xpTotal, maiorElo);
+    return montarProgressoNivel(dados, retrato);
   }
 
   /**
@@ -218,15 +238,168 @@ export class ProgressaoService {
     return { dados, metadados: montarMetadadosPaginacao(paginacao, total) };
   }
 
+  /**
+   * Historico paginado de progressao de elo do usuario: promocoes, rebaixamentos por
+   * inatividade e recuperacoes.
+   *
+   * @param usuarioId Usuario autenticado.
+   * @param query Paginacao.
+   * @returns Pagina do historico de elo.
+   */
+  async buscarHistoricoElo(
+    usuarioId: string,
+    query: HistoricoXpQueryDto,
+  ): Promise<RespostaPaginada<EventoEloDto>> {
+    this.exigirUsuario(usuarioId);
+
+    const paginacao = resolverParametrosPaginacao(query);
+    const { data, total } = await listarHistoricoElo(usuarioId, paginacao);
+
+    const dados: EventoEloDto[] = data.map((evento) => ({
+      id: evento.id,
+      data: evento.criadoEm.toISOString(),
+      tipo: evento.tipo,
+      eloAnterior: obterFaixaEloPorCodigo(evento.eloAnterior),
+      eloNovo: obterFaixaEloPorCodigo(evento.eloNovo),
+      xpEloAntes: evento.xpEloAntes,
+      xpEloDepois: evento.xpEloDepois,
+      diasInatividade: evento.diasInatividade,
+    }));
+
+    return { dados, metadados: montarMetadadosPaginacao(paginacao, total) };
+  }
+
+  /**
+   * Avisos de elo do proprio usuario (aviso preventivo, risco, vespera, rebaixamento e
+   * recuperacao). Nunca aceita o id de outro estudante: o destinatario e sempre o
+   * usuario autenticado.
+   *
+   * @param usuarioId Usuario autenticado.
+   * @param apenasNaoLidas Filtra os avisos ainda nao lidos.
+   * @returns Avisos do usuario, mais recentes primeiro.
+   */
+  async buscarNotificacoes(
+    usuarioId: string,
+    apenasNaoLidas = false,
+  ): Promise<NotificacaoEloDto[]> {
+    this.exigirUsuario(usuarioId);
+
+    // Garante que os avisos ja vencidos existam antes da leitura.
+    await aplicarInatividade(usuarioId);
+
+    const notificacoes = await listarNotificacoes(usuarioId, apenasNaoLidas);
+
+    return notificacoes.map((notificacao) => ({
+      id: notificacao.id,
+      data: notificacao.criadoEm.toISOString(),
+      tipo: notificacao.tipo,
+      titulo: notificacao.titulo,
+      mensagem: notificacao.mensagem,
+      eloRelacionado: notificacao.eloRelacionado,
+      prazoRebaixamentoEm: notificacao.prazoRebaixamentoEm
+        ? notificacao.prazoRebaixamentoEm.toISOString()
+        : null,
+      lida: notificacao.lidaEm !== null,
+    }));
+  }
+
+  /**
+   * Marca um aviso do proprio usuario como lido.
+   *
+   * @param id Id da notificacao.
+   * @param usuarioId Usuario autenticado.
+   * @throws ErroAplicacao 404 se a notificacao nao existir ou nao for do usuario.
+   */
+  async marcarNotificacaoLida(id: string, usuarioId: string): Promise<void> {
+    this.exigirUsuario(usuarioId);
+
+    const marcada = await marcarNotificacaoLida(id, usuarioId);
+
+    if (!marcada) {
+      throw new ErroAplicacao({
+        codigoStatus: 404,
+        codigo: CodigoDeErro.NAO_ENCONTRADO,
+        mensagem: "Notificação não encontrada.",
+      });
+    }
+  }
+
+  /**
+   * Rotina autorizada de verificacao de inatividade: avalia todos os estudantes com
+   * inatividade acumulada e aplica o que estiver vencido.
+   *
+   * Nao recebe identificador de usuario — cada conta e avaliada pelos proprios dados de
+   * atividade, entao a chamada nao pode ser usada para agir sobre a conta de outro.
+   *
+   * @returns Totais avaliados, rebaixados e notificados.
+   */
+  async verificarInatividade(): Promise<ResultadoVerificacaoInatividadeDto> {
+    return await aplicarInatividadeEmLote();
+  }
+
+  /**
+   * Prazos vigentes da regra de inatividade (uso administrativo).
+   *
+   * @returns Configuracao atual.
+   */
+  async buscarConfiguracaoInatividade(): Promise<ConfiguracaoInatividadeDto> {
+    return this.converterConfiguracao(await buscarConfiguracaoCompleta());
+  }
+
+  /**
+   * Altera os prazos da regra de inatividade. A restricao ao papel administrativo e
+   * feita na rota; aqui so registramos quem alterou.
+   *
+   * @param dados Novos prazos e janelas de indisponibilidade.
+   * @param usuarioId Administrador responsavel.
+   * @returns Configuracao atualizada.
+   */
+  async salvarConfiguracaoInatividade(
+    dados: {
+      diasAviso: number;
+      diasRisco: number;
+      diasRebaixamento: number;
+      diasEntreRebaixamentos: number;
+      indisponibilidades: { inicio: string; fim: string }[];
+    },
+    usuarioId: string,
+  ): Promise<ConfiguracaoInatividadeDto> {
+    this.exigirUsuario(usuarioId);
+
+    return this.converterConfiguracao(await salvarConfiguracao(dados, usuarioId));
+  }
+
+  private converterConfiguracao(linha: {
+    diasAviso: number;
+    diasRisco: number;
+    diasRebaixamento: number;
+    diasEntreRebaixamentos: number;
+    indisponibilidades: unknown;
+    atualizadoPorId: string | null;
+    atualizadoEm: Date | null;
+  }): ConfiguracaoInatividadeDto {
+    return {
+      diasAviso: linha.diasAviso,
+      diasRisco: linha.diasRisco,
+      diasRebaixamento: linha.diasRebaixamento,
+      diasEntreRebaixamentos: linha.diasEntreRebaixamentos,
+      indisponibilidades: Array.isArray(linha.indisponibilidades)
+        ? (linha.indisponibilidades as { inicio: string; fim: string }[])
+        : [],
+      atualizadoPorId: linha.atualizadoPorId,
+      // null = nenhum administrador alterou os prazos ainda (valem os padroes da US).
+      atualizadoEm: linha.atualizadoEm ? linha.atualizadoEm.toISOString() : null,
+    };
+  }
+
   // Monta o resultado a partir do que esta gravado na rodada (base da idempotencia).
   private async montarResultado(
     tentativa: TentativaParaConclusao,
     jaConcluida: boolean,
   ): Promise<ResultadoTentativaDto> {
     const transacao = tentativa.transacaoXp;
-    const { xpTotal: xpTotalAtual, maiorElo } = await this.repository.buscarDadosProgresso(
-      tentativa.usuarioId,
-    );
+    const estado = await this.repository.buscarDadosProgresso(tentativa.usuarioId);
+    const xpTotalAtual = estado.xpTotal;
 
     const recompensa: RecompensaXpDto = transacao
       ? {
@@ -237,23 +410,28 @@ export class ProgressaoService {
         }
       : RECOMPENSA_ZERADA;
 
-    // Nivel e elo antes/depois desta rodada, reconstruidos pelo XP acumulado da epoca
-    // e respeitando a regra de nao regressao caso o aluno ja tivesse um maiorElo superior.
+    // Nivel antes/depois desta rodada, reconstruido pelo XP total da epoca.
     const xpApos = transacao ? transacao.xpTotalApos : xpTotalAtual;
-    const xpAntes = Math.max(0, xpApos - recompensa.xpTotalRecebido);
-    const nivelAnterior = calcularNivel(xpAntes);
+    const nivelAnterior = calcularNivel(Math.max(0, xpApos - recompensa.xpTotalRecebido));
     const nivelApos = calcularNivel(xpApos);
 
-    const progresso = montarProgressoNivel(xpTotalAtual, maiorElo);
-    const progressoDaTentativa =
-      xpApos === xpTotalAtual ? progresso : montarProgressoNivel(xpApos, maiorElo);
+    const config = await buscarConfiguracao();
+    const progresso = montarProgressoNivel(
+      estado,
+      montarRetratoInatividade(estado, new Date(), config),
+    );
 
-    const eloAposPeloXp = calcularFaixaEloPorXp(xpApos);
-    const novoElo = progressoDaTentativa.eloAtual;
-    const eloAnterior =
-      novoElo.ordem > eloAposPeloXp.ordem ? novoElo : calcularFaixaEloPorXp(xpAntes);
+    // Elo antes/depois DESTA rodada, reconstruido pelo XP de elo gravado na transacao.
+    // Usar o saldo atual aqui seria errado numa chamada repetida (o endpoint e
+    // idempotente): o aluno pode ter ganhado XP depois, e a rodada antiga passaria a
+    // reivindicar uma subida de elo que nao foi dela.
+    const xpEloApos = transacao ? transacao.xpEloApos : estado.xpElo;
+    const eloAnterior = calcularFaixaEloPorXp(Math.max(0, xpEloApos - recompensa.xpTotalRecebido));
+    const novoElo = transacao
+      ? calcularFaixaEloPorXp(xpEloApos)
+      : obterFaixaEloPorCodigo(estado.eloAtual);
     const subiuDeElo = novoElo.ordem > eloAnterior.ordem;
-    const xpExcedenteElo = progressoDaTentativa.xpNoElo;
+    const xpExcedenteElo = Math.max(0, xpEloApos - novoElo.xpMinimo);
 
     return {
       tentativaId: tentativa.id,

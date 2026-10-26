@@ -1,4 +1,4 @@
-import { calcularNivel, resolverFaixaElo } from '../progressao/progressao.regras';
+import { calcularNivel, obterFaixaEloPorCodigo } from '../progressao/progressao.regras';
 
 import type { RankingRepository } from './ranking.repository';
 import type { PontuacaoUsuario } from './ranking.types';
@@ -36,7 +36,9 @@ export class RankingService {
 
     const pontuacoes: PontuacaoUsuario[] = linhas.map((linha) => {
       const xpTotal = Number(linha.xpTotal ?? 0);
-      const faixaElo = resolverFaixaElo(xpTotal, linha.maiorElo);
+      // O ranking exibe o elo ATUAL (que pode ter caido por inatividade), nao o maior
+      // elo ja conquistado. A ordenacao continua pelo XP total.
+      const faixaElo = obterFaixaEloPorCodigo(linha.eloAtual ?? 'CURIOSO');
 
       return {
         usuarioId: linha.usuarioId,

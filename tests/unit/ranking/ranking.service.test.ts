@@ -49,7 +49,7 @@ describe("RankingService.obterPontuacoes", () => {
   it("ordena por XP antes dos acertos e calcula nivel e elo de cada usuario", async () => {
     repositoryMock.agregarPontuacoes.mockResolvedValue([
       { usuarioId: "muitos-acertos", acertos: 50n, respondidas: 60n, ultimaAtividade: null, xpTotal: 90 },
-      { usuarioId: "mais-xp", acertos: 10n, respondidas: 20n, ultimaAtividade: null, xpTotal: 1520n, maiorElo: EloXp.INTERNO },
+      { usuarioId: "mais-xp", acertos: 10n, respondidas: 20n, ultimaAtividade: null, xpTotal: 1520n, eloAtual: EloXp.INTERNO, maiorElo: EloXp.INTERNO },
     ]);
 
     const resultado = await service.obterPontuacoes();
@@ -57,6 +57,25 @@ describe("RankingService.obterPontuacoes", () => {
     expect(resultado.map((linha) => linha.usuarioId)).toEqual(["mais-xp", "muitos-acertos"]);
     expect(resultado[0]).toMatchObject({ xpTotal: 1520, nivel: 6, elo: "Interno" });
     expect(resultado[1]).toMatchObject({ xpTotal: 90, nivel: 1, elo: "Curioso" });
+  });
+
+  it("exibe o elo atual rebaixado, nao o maior elo conquistado", async () => {
+    repositoryMock.agregarPontuacoes.mockResolvedValue([
+      {
+        usuarioId: "rebaixado",
+        acertos: 10n,
+        respondidas: 20n,
+        ultimaAtividade: null,
+        xpTotal: 7000n,
+        eloAtual: EloXp.R1,
+        maiorElo: EloXp.R3,
+      },
+    ]);
+
+    const [linha] = await service.obterPontuacoes();
+
+    // O XP total (base da ordenacao) nao muda com o rebaixamento; o elo exibido, sim.
+    expect(linha).toMatchObject({ xpTotal: 7000, elo: "R1" });
   });
 
   it("repassa a lista de ids ao repositorio", async () => {

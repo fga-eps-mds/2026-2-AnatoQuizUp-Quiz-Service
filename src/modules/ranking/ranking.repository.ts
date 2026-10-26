@@ -8,13 +8,14 @@ export interface LinhaPontuacao {
   respondidas: bigint;
   ultimaAtividade: Date | null;
   xpTotal: number | bigint | null;
+  eloAtual?: EloXp | null;
   maiorElo?: EloXp | null;
 }
 
 export class RankingRepository {
   /**
    * Agrega o desempenho de cada usuário a partir das resoluções de questões
-   * e junta o XP acumulado e o maior elo (0 / CURIOSO para quem ainda não concluiu
+   * e junta o XP acumulado, o elo atual e o maior elo (0 / CURIOSO para quem ainda não concluiu
    * nenhuma rodada de quiz). Quando `usuarioIds` é informado, restringe o cálculo
    * a esses usuários (usado pelo ranking de amigos); caso contrário, considera todos
    * os participantes (ranking geral).
@@ -35,6 +36,7 @@ export class RankingRepository {
         COUNT(*) AS "respondidas",
         MAX(r."criadoEm") AS "ultimaAtividade",
         COALESCE(MAX(p."xpTotal"), 0) AS "xpTotal",
+        MAX(p."eloAtual") AS "eloAtual",
         MAX(p."maiorElo") AS "maiorElo"
       FROM "resolucoes_questoes" r
       JOIN "questoes" q ON q."id" = r."questaoId"
