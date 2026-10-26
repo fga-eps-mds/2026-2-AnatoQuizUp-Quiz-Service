@@ -63,6 +63,29 @@ enum EloXp {
   STAFF_DO_SERVICO
 }
 
+// Estado do elo quanto a inatividade do estudante (US #89).
+enum EstadoElo {
+  ATIVO
+  EM_RISCO
+  REBAIXADO
+}
+
+// Evento registrado no historico de progressao de elo.
+enum TipoEventoElo {
+  PROMOCAO
+  REBAIXAMENTO
+  RECUPERACAO
+}
+
+// Avisos enviados ao estudante ao longo do ciclo de inatividade.
+enum TipoNotificacaoElo {
+  AVISO_PREVENTIVO
+  ELO_EM_RISCO
+  VESPERA_REBAIXAMENTO
+  ELO_REBAIXADO
+  ELO_RECUPERADO
+}
+
 enum StatusResolucaoLista {
   EM_ANDAMENTO
   SUBMETIDA
@@ -245,21 +268,102 @@ model TentativaQuiz {
   @@map("tentativas_quiz")
 }
 
-// XP acumulado do usuario. Permanente: so cresce, e a base do nivel e do ranking geral.
-// maiorElo preserva o maior elo ja conquistado para que mudancas futuras nas faixas
-// nunca reduzam automaticamente o elo do estudante.
+// Saldos de XP e elo do estudante.
+//
+// xpTotal  : todo o XP ja conquistado. Permanente, nunca reduzido; base do nivel e do ranking.
+// xpElo    : pontuacao que determina o elo. Cresce junto com o xpTotal, mas e reduzida por
+//            inatividade (rebaixamento), por isso vive num campo proprio.
+// eloAtual : elo exibido no perfil e no ranking. Pode cair por inatividade.
+// maiorElo : maior elo ja conquistado. So cresce, preservado durante todo o rebaixamento.
 model ProgressoXp {
   id        String @id @default(cuid())
   usuarioId String @unique
   xpTotal   Int    @default(0)
+  xpElo     Int    @default(0)
+  eloAtual  EloXp  @default(CURIOSO)
   maiorElo  EloXp  @default(CURIOSO)
 
-  transacoes TransacaoXp[]
+  // Ultima atividade que concedeu XP. null = estudante nunca pontuou (nao sofre rebaixamento).
+  ultimaAtividadeEm DateTime?
+
+  // Rebaixamentos ja aplicados no ciclo de inatividade corrente. Zerado por atividade valida.
+  // E o que torna a rotina de verificacao idempotente (reexecutar nao rebaixa de novo).
+  rebaixamentosAplicados Int @default(0)
+
+  transacoes  TransacaoXp[]
+  eventosElo  EventoElo[]
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
   @@map("progressos_xp")
+}
+
+// Historico de progressao de elo: promocoes, rebaixamentos por inatividade e recuperacoes.
+model EventoElo {
+  id        String @id @default(cuid())
+  usuarioId String
+
+  tipo        TipoEventoElo
+  eloAnterior EloXp
+  eloNovo     EloXp
+
+  xpEloAntes  Int
+  xpEloDepois Int
+
+  // Dias de inatividade que motivaram o rebaixamento (null nas promocoes/recuperacoes).
+  diasInatividade Int?
+
+  progresso ProgressoXp @relation(fields: [usuarioId], references: [usuarioId], onDelete: Restrict)
+
+  criadoEm DateTime @default(now())
+
+  @@index([usuarioId, criadoEm])
+  @@map("eventos_elo")
+}
+
+// Avisos de inatividade, rebaixamento e recuperacao destinados a um unico estudante.
+// A chave de deduplicacao amarra o aviso ao ciclo de inatividade que o gerou, para que a
+// rotina possa rodar quantas vezes quiser sem repetir a mesma notificacao.
+model NotificacaoElo {
+  id        String @id @default(cuid())
+  usuarioId String
+
+  tipo  TipoNotificacaoElo
+  chave String
+
+  titulo   String
+  mensagem String
+
+  eloRelacionado      EloXp?
+  prazoRebaixamentoEm DateTime?
+
+  lidaEm   DateTime?
+  criadoEm DateTime  @default(now())
+
+  @@unique([usuarioId, tipo, chave])
+  @@index([usuarioId, criadoEm])
+  @@map("notificacoes_elo")
+}
+
+// Linha unica (id "global") com os prazos da regra de inatividade. Editavel apenas pelo
+// papel ADMINISTRADOR; os valores padrao sao os da US #89.
+model ConfiguracaoInatividade {
+  id String @id @default("global")
+
+  diasAviso              Int @default(7)
+  diasRisco              Int @default(8)
+  diasRebaixamento       Int @default(9)
+  diasEntreRebaixamentos Int @default(14)
+
+  // Indisponibilidades reconhecidas da plataforma: [{ "inicio": ISO, "fim": ISO }].
+  // O tempo dentro dessas janelas nao conta como inatividade do estudante.
+  indisponibilidades Json @default("[]")
+
+  atualizadoPorId String?
+  atualizadoEm    DateTime @updatedAt
+
+  @@map("configuracao_inatividade")
 }
 
 // Historico de XP recebido. tentativaId unico garante que a mesma rodada nao paga duas vezes.
@@ -279,6 +383,10 @@ model TransacaoXp {
 
   // XP acumulado logo apos esta transacao (permite reconstruir o nivel da epoca).
   xpTotalApos Int
+
+  // XP de elo logo apos esta transacao. Diferente do xpTotalApos depois de um
+  // rebaixamento, e o que permite reconstruir o elo da epoca numa chamada repetida.
+  xpEloApos Int @default(0)
 
   progresso ProgressoXp    @relation(fields: [usuarioId], references: [usuarioId], onDelete: Restrict)
   tentativa TentativaQuiz? @relation(fields: [tentativaId], references: [id], onDelete: Restrict)

@@ -6,8 +6,8 @@ import { prisma } from "@/config/db";
 import type { RegistroQuestaoCompleta } from "@/modules/questoes/dto/question.types";
 import type { ParametrosPaginacao } from "@/shared/utils/paginacao.util";
 
-import { calcularFaixaEloPorXp, resolverFaixaElo } from "./progressao.regras";
-import type { IniciarTentativaDto, RecompensaXpDto } from "./progressao.types";
+import { creditarXp } from "./elo.repository";
+import type { DadosProgressoElo, IniciarTentativaDto, RecompensaXpDto } from "./progressao.types";
 
 // Repository da progressao (Prisma): rodadas de quiz, XP acumulado e historico de XP.
 
@@ -55,9 +55,9 @@ type ConcluirTentativaParams = {
   recompensa: RecompensaXpDto | null;
 };
 
-export type DadosProgressoBanco = {
-  xpTotal: number;
-  maiorElo: EloXp;
+export type DadosProgressoBanco = DadosProgressoElo & {
+  ultimaAtividadeEm: Date | null;
+  rebaixamentosAplicados: number;
 };
 
 export class ProgressaoRepository {
@@ -147,9 +147,7 @@ export class ProgressaoRepository {
    * @param params Rodada, acertos e recompensa calculada.
    * @returns Se a rodada foi concluida por esta chamada.
    */
-  async concluirTentativa(
-    params: ConcluirTentativaParams,
-  ): Promise<{
+  async concluirTentativa(params: ConcluirTentativaParams): Promise<{
     concluidaAgora: boolean;
     missoesConcluidas?: { nome: string; recompensaXp: number }[];
   }> {
@@ -173,25 +171,9 @@ export class ProgressaoRepository {
       }
 
       if (recompensa) {
-        const eloInicial = calcularFaixaEloPorXp(recompensa.xpTotalRecebido).codigo;
-        const progresso = await tx.progressoXp.upsert({
-          where: { usuarioId },
-          create: {
-            usuarioId,
-            xpTotal: recompensa.xpTotalRecebido,
-            maiorElo: eloInicial,
-          },
-          update: { xpTotal: { increment: recompensa.xpTotalRecebido } },
-          select: { xpTotal: true, maiorElo: true },
-        });
-
-        const eloEfetivo = resolverFaixaElo(progresso.xpTotal, progresso.maiorElo);
-        if (eloEfetivo.codigo !== progresso.maiorElo) {
-          await tx.progressoXp.update({
-            where: { usuarioId },
-            data: { maiorElo: eloEfetivo.codigo },
-          });
-        }
+        // Concluir uma rodada que concede XP e a atividade valida da US #89: soma nos dois
+        // saldos, reinicia a contagem de inatividade e pode recuperar um elo perdido.
+        const progresso = await creditarXp(tx, usuarioId, recompensa.xpTotalRecebido, agora);
 
         await tx.transacaoXp.create({
           data: {
@@ -202,6 +184,7 @@ export class ProgressaoRepository {
             bonusPowerUp: recompensa.bonusPowerUp,
             quantidade: recompensa.xpTotalRecebido,
             xpTotalApos: progresso.xpTotal,
+            xpEloApos: progresso.xpElo,
           },
         });
       }
@@ -240,20 +223,32 @@ export class ProgressaoRepository {
   }
 
   /**
-   * XP acumulado e maior elo ja conquistado pelo usuario.
+   * Estado de XP e elo do usuario: os dois saldos, o elo atual, o maior elo conquistado
+   * e os dados de inatividade.
    *
    * @param usuarioId Id do usuario.
-   * @returns XP total e maiorElo (padrao 0 e CURIOSO se ainda nao houver registro).
+   * @returns Estado do progresso (zerado e CURIOSO se ainda nao houver registro).
    */
   async buscarDadosProgresso(usuarioId: string): Promise<DadosProgressoBanco> {
     const progresso = await prisma.progressoXp.findUnique({
       where: { usuarioId },
-      select: { xpTotal: true, maiorElo: true },
+      select: {
+        xpTotal: true,
+        xpElo: true,
+        eloAtual: true,
+        maiorElo: true,
+        ultimaAtividadeEm: true,
+        rebaixamentosAplicados: true,
+      },
     });
 
     return {
       xpTotal: progresso?.xpTotal ?? 0,
+      xpElo: progresso?.xpElo ?? 0,
+      eloAtual: progresso?.eloAtual ?? EloXp.CURIOSO,
       maiorElo: progresso?.maiorElo ?? EloXp.CURIOSO,
+      ultimaAtividadeEm: progresso?.ultimaAtividadeEm ?? null,
+      rebaixamentosAplicados: progresso?.rebaixamentosAplicados ?? 0,
     };
   }
 

@@ -1,4 +1,4 @@
-import { EloXp } from "@prisma/client";
+import { EloXp, EstadoElo } from "@prisma/client";
 
 import { FAIXAS_ELO } from "@/modules/progressao/progressao.constants";
 import {
@@ -7,10 +7,37 @@ import {
   calcularRecompensaXp,
   montarProgressoNivel,
   obterFaixaEloPorCodigo,
-  resolverFaixaElo,
   xpAcumuladoParaNivel,
 } from "@/modules/progressao/progressao.regras";
-import type { FaixaEloDto } from "@/modules/progressao/progressao.types";
+import type {
+  DadosProgressoElo,
+  FaixaEloDto,
+  RetratoInatividade,
+} from "@/modules/progressao/progressao.types";
+
+// Desde a US #89 o elo e persistido (pode cair por inatividade), entao montarProgressoNivel
+// recebe o estado gravado em vez de derivar tudo do XP total. Nos cenarios de evolucao
+// normal o XP de elo acompanha o XP total e o elo e o que a faixa indica.
+const ATIVO: RetratoInatividade = {
+  estado: EstadoElo.ATIVO,
+  diasInatividade: 0,
+  ultimaAtividadeEm: null,
+  prazoRebaixamentoEm: null,
+};
+
+const progressoDe = (
+  xp: number,
+  sobrescritas: Partial<DadosProgressoElo> = {},
+  faixas: readonly FaixaEloDto[] = FAIXAS_ELO,
+) => {
+  const elo = calcularFaixaEloPorXp(xp, faixas).codigo;
+
+  return montarProgressoNivel(
+    { xpTotal: xp, xpElo: xp, eloAtual: elo, maiorElo: elo, ...sobrescritas },
+    ATIVO,
+    faixas,
+  );
+};
 
 describe("Regras de progressao - calcularRecompensaXp", () => {
   it("soma XP base por questao e bonus por acerto conforme a dificuldade", () => {
@@ -60,7 +87,7 @@ describe("Regras de progressao - niveis", () => {
   });
 
   it("monta o progresso dentro do nivel com XP faltante e percentual", () => {
-    expect(montarProgressoNivel(150)).toMatchObject({
+    expect(progressoDe(150)).toMatchObject({
       xpTotal: 150,
       nivel: 2,
       proximoNivel: 3,
@@ -72,7 +99,7 @@ describe("Regras de progressao - niveis", () => {
   });
 
   it("comeca do zero para quem ainda nao tem XP", () => {
-    const progresso = montarProgressoNivel(0);
+    const progresso = progressoDe(0);
     expect(progresso).toMatchObject({
       xpTotal: 0,
       nivel: 1,
@@ -114,11 +141,11 @@ describe("Regras de progressao - elos e faixas de XP", () => {
   });
 
   it("calcula evolucao automatica e mantem XP excedente (490 + 20 = 510 XP -> Academico)", () => {
-    const antes = montarProgressoNivel(490);
+    const antes = progressoDe(490);
     expect(antes.eloAtual.nome).toBe("Curioso");
     expect(antes.xpFaltanteProximoElo).toBe(10);
 
-    const depois = montarProgressoNivel(510);
+    const depois = progressoDe(510);
     expect(depois.xpTotal).toBe(510);
     expect(depois.eloAtual.nome).toBe("Acadêmico");
     expect(depois.proximoElo?.nome).toBe("Interno");
@@ -127,7 +154,7 @@ describe("Regras de progressao - elos e faixas de XP", () => {
   });
 
   it("informa que faltam 300 XP para Interno quando o estudante possui 1200 XP", () => {
-    const progresso = montarProgressoNivel(1200);
+    const progresso = progressoDe(1200);
 
     expect(progresso.eloAtual.nome).toBe("Acadêmico");
     expect(progresso.proximoElo?.nome).toBe("Interno");
@@ -136,7 +163,7 @@ describe("Regras de progressao - elos e faixas de XP", () => {
   });
 
   it("exibe Staff do servico sem proximo elo quando possui 15000 XP ou mais", () => {
-    const progresso = montarProgressoNivel(15000);
+    const progresso = progressoDe(15000);
 
     expect(progresso.eloAtual.nome).toBe("Staff do serviço");
     expect(progresso.proximoElo).toBeNull();
@@ -151,19 +178,46 @@ describe("Regras de progressao - elos e faixas de XP", () => {
       faixa.codigo === EloXp.R3 ? { ...faixa, xpMinimo: 8000 } : faixa,
     );
 
-    // Estudante tinha 6500 XP e ja havia conquistado R3 antes da mudanca de faixa
-    const faixaResolvida = resolverFaixaElo(6500, EloXp.R3, faixasReajustadas);
-    expect(faixaResolvida.codigo).toBe(EloXp.R3);
-    expect(faixaResolvida.nome).toBe("R3");
+    // Estudante tinha 6500 XP e ja havia conquistado R3 antes da mudanca de faixa:
+    // o elo persistido continua valendo, a alteracao de faixa nao rebaixa ninguem.
+    const progresso = progressoDe(
+      6500,
+      { eloAtual: EloXp.R3, maiorElo: EloXp.R3 },
+      faixasReajustadas,
+    );
 
-    const progresso = montarProgressoNivel(6500, EloXp.R3, faixasReajustadas);
     expect(progresso.eloAtual.nome).toBe("R3");
     expect(progresso.maiorElo.nome).toBe("R3");
     expect(progresso.proximoElo?.nome).toBe("R6");
   });
 
+  it("exibe o elo atual rebaixado sem perder o maior elo conquistado", () => {
+    // Apos cair de R3 para R1 por inatividade, o XP total segue intacto (7000) e o
+    // XP de elo fica no topo da faixa R1 (5999).
+    const progresso = montarProgressoNivel(
+      { xpTotal: 7000, xpElo: 5999, eloAtual: EloXp.R1, maiorElo: EloXp.R3 },
+      {
+        estado: EstadoElo.REBAIXADO,
+        diasInatividade: 9,
+        ultimaAtividadeEm: new Date("2026-10-17T00:00:00.000Z"),
+        prazoRebaixamentoEm: new Date("2026-10-31T00:00:00.000Z"),
+      },
+    );
+
+    expect(progresso.xpTotal).toBe(7000);
+    expect(progresso.xpElo).toBe(5999);
+    expect(progresso.eloAtual.codigo).toBe(EloXp.R1);
+    expect(progresso.maiorElo.codigo).toBe(EloXp.R3);
+    expect(progresso.proximoElo?.codigo).toBe(EloXp.R3);
+    expect(progresso.xpFaltanteProximoElo).toBe(1);
+    expect(progresso.estadoElo).toBe(EstadoElo.REBAIXADO);
+    expect(progresso.diasInatividade).toBe(9);
+    expect(progresso.ultimaAtividadeEm).toBe("2026-10-17T00:00:00.000Z");
+    expect(progresso.prazoRebaixamentoEm).toBe("2026-10-31T00:00:00.000Z");
+  });
+
   it("monta a jornada completa com status CONQUISTADO, ELO_ATUAL, PROXIMO_ELO, BLOQUEADO e ELO_MAXIMO", () => {
-    const progresso = montarProgressoNivel(2420);
+    const progresso = progressoDe(2420);
 
     expect(progresso.todosOsElos.map((item) => [item.nome, item.status])).toEqual([
       ["Curioso", "CONQUISTADO"],

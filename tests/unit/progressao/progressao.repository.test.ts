@@ -1,9 +1,14 @@
 import { EloXp, StatusTentativaQuiz } from "@prisma/client";
 
 import { prisma } from "@/config/db";
+import { creditarXp } from "@/modules/progressao/elo.repository";
 import { ProgressaoRepository } from "@/modules/progressao/progressao.repository";
 
 jest.mock("@/modules/missoes/missoes.repository", () => ({ bloquearMissoes: jest.fn(), contabilizarQuiz: jest.fn() }));
+
+// O credito de XP (e o efeito dele sobre o elo) tem testes proprios em
+// elo.repository.test.ts; aqui so interessa que a conclusao da rodada passe por ele.
+jest.mock("@/modules/progressao/elo.repository", () => ({ creditarXp: jest.fn() }));
 
 jest.mock("@/config/db", () => ({
   prisma: {
@@ -27,10 +32,10 @@ const tentativaFindFirst = prisma.tentativaQuiz.findFirst as jest.Mock;
 const tentativaUpdateMany = prisma.tentativaQuiz.updateMany as jest.Mock;
 const progressoFindUnique = prisma.progressoXp.findUnique as jest.Mock;
 const progressoUpsert = prisma.progressoXp.upsert as jest.Mock;
-const progressoUpdate = prisma.progressoXp.update as jest.Mock;
 const transacaoCreate = prisma.transacaoXp.create as jest.Mock;
 const transacaoFindMany = prisma.transacaoXp.findMany as jest.Mock;
 const transacaoCount = prisma.transacaoXp.count as jest.Mock;
+const creditarXpMock = creditarXp as jest.Mock;
 
 describe("ProgressaoRepository", () => {
   let repository: ProgressaoRepository;
@@ -118,7 +123,14 @@ describe("ProgressaoRepository", () => {
 
     it("fecha a rodada, soma o XP e registra a transacao com o acumulado", async () => {
       tentativaUpdateMany.mockResolvedValue({ count: 1 });
-      progressoUpsert.mockResolvedValue({ xpTotal: 135, maiorElo: EloXp.CURIOSO });
+      creditarXpMock.mockResolvedValue({
+        xpTotal: 135,
+        xpElo: 135,
+        eloAtual: EloXp.CURIOSO,
+        maiorElo: EloXp.CURIOSO,
+        eventoElo: null,
+        eloAnterior: EloXp.CURIOSO,
+      });
 
       const resultado = await repository.concluirTentativa({
         tentativaId: "t1",
@@ -136,13 +148,13 @@ describe("ProgressaoRepository", () => {
           totalAcertos: 3,
         },
       });
-      expect(progressoUpsert).toHaveBeenCalledWith({
-        where: { usuarioId: "aluno-1" },
-        create: { usuarioId: "aluno-1", xpTotal: 35, maiorElo: EloXp.CURIOSO },
-        update: { xpTotal: { increment: 35 } },
-        select: { xpTotal: true, maiorElo: true },
-      });
-      expect(progressoUpdate).not.toHaveBeenCalled();
+      // Caminho unico de credito: soma nos dois saldos e registra a atividade valida.
+      expect(creditarXpMock).toHaveBeenCalledWith(
+        expect.anything(),
+        "aluno-1",
+        35,
+        expect.any(Date),
+      );
       expect(transacaoCreate).toHaveBeenCalledWith({
         data: {
           usuarioId: "aluno-1",
@@ -152,13 +164,21 @@ describe("ProgressaoRepository", () => {
           bonusPowerUp: 0,
           quantidade: 35,
           xpTotalApos: 135,
+          xpEloApos: 135,
         },
       });
     });
 
-    it("atualiza maiorElo quando o XP acumulado atinge uma nova faixa de elo", async () => {
+    it("grava a transacao com o XP total devolvido pelo credito", async () => {
       tentativaUpdateMany.mockResolvedValue({ count: 1 });
-      progressoUpsert.mockResolvedValue({ xpTotal: 520, maiorElo: EloXp.CURIOSO });
+      creditarXpMock.mockResolvedValue({
+        xpTotal: 520,
+        xpElo: 520,
+        eloAtual: EloXp.ACADEMICO,
+        maiorElo: EloXp.ACADEMICO,
+        eventoElo: "PROMOCAO",
+        eloAnterior: EloXp.CURIOSO,
+      });
 
       await repository.concluirTentativa({
         tentativaId: "t1",
@@ -167,10 +187,9 @@ describe("ProgressaoRepository", () => {
         recompensa,
       });
 
-      expect(progressoUpdate).toHaveBeenCalledWith({
-        where: { usuarioId: "aluno-1" },
-        data: { maiorElo: EloXp.ACADEMICO },
-      });
+      expect(transacaoCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ xpTotalApos: 520 }) }),
+      );
     });
 
     it("nao credita XP quando a rodada ja tinha sido concluida", async () => {
@@ -211,18 +230,35 @@ describe("ProgressaoRepository", () => {
     await expect(repository.buscarXpTotal("aluno-2")).resolves.toBe(0);
   });
 
-  it("devolve os dados de progresso (xpTotal e maiorElo) ou valores padrao", async () => {
+  it("devolve o estado completo de XP e elo ou valores padrao", async () => {
+    const ultimaAtividade = new Date("2026-10-20T00:00:00.000Z");
+
     progressoFindUnique
-      .mockResolvedValueOnce({ xpTotal: 1500, maiorElo: EloXp.INTERNO })
+      .mockResolvedValueOnce({
+        xpTotal: 1500,
+        xpElo: 1200,
+        eloAtual: EloXp.ACADEMICO,
+        maiorElo: EloXp.INTERNO,
+        ultimaAtividadeEm: ultimaAtividade,
+        rebaixamentosAplicados: 1,
+      })
       .mockResolvedValueOnce(null);
 
     await expect(repository.buscarDadosProgresso("aluno-1")).resolves.toEqual({
       xpTotal: 1500,
+      xpElo: 1200,
+      eloAtual: EloXp.ACADEMICO,
       maiorElo: EloXp.INTERNO,
+      ultimaAtividadeEm: ultimaAtividade,
+      rebaixamentosAplicados: 1,
     });
     await expect(repository.buscarDadosProgresso("aluno-2")).resolves.toEqual({
       xpTotal: 0,
+      xpElo: 0,
+      eloAtual: EloXp.CURIOSO,
       maiorElo: EloXp.CURIOSO,
+      ultimaAtividadeEm: null,
+      rebaixamentosAplicados: 0,
     });
   });
 

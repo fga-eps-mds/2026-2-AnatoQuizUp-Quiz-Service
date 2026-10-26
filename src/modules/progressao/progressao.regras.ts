@@ -7,10 +7,12 @@ import {
   XP_POR_NIVEL,
 } from "./progressao.constants";
 import type {
+  DadosProgressoElo,
   EloJornadaDto,
   FaixaEloDto,
   ProgressoNivelDto,
   RecompensaXpDto,
+  RetratoInatividade,
   StatusFaixaElo,
 } from "./progressao.types";
 
@@ -121,30 +123,6 @@ export function calcularFaixaEloPorXp(
 }
 
 /**
- * Resolve o elo efetivo do estudante respeitando a regra de nao-regressao:
- * alteracoes futuras nas faixas ou qualquer recalculo nao reduzem um elo ja conquistado.
- *
- * @param xpTotal XP total acumulado.
- * @param maiorEloSalvo Maior elo ja persistido para o estudante (opcional).
- * @param faixas Lista de faixas configuradas.
- * @returns A maior faixa entre a calculada pelo XP e a ja conquistada.
- */
-export function resolverFaixaElo(
-  xpTotal: number,
-  maiorEloSalvo?: EloXp | null,
-  faixas: readonly FaixaEloDto[] = FAIXAS_ELO,
-): FaixaEloDto {
-  const peloXp = calcularFaixaEloPorXp(xpTotal, faixas);
-
-  if (!maiorEloSalvo) {
-    return peloXp;
-  }
-
-  const salvo = obterFaixaEloPorCodigo(maiorEloSalvo, faixas);
-  return salvo.ordem > peloXp.ordem ? salvo : peloXp;
-}
-
-/**
  * Calcula o status de uma faixa especifica na tela "Todos os elos".
  */
 function calcularStatusFaixaJornada(
@@ -152,6 +130,7 @@ function calcularStatusFaixaJornada(
   eloAtual: FaixaEloDto,
   proximoElo: FaixaEloDto | null,
   totalFaixas: number,
+  maiorElo: FaixaEloDto,
 ): StatusFaixaElo {
   if (faixa.ordem < eloAtual.ordem) {
     return "CONQUISTADO";
@@ -162,6 +141,11 @@ function calcularStatusFaixaJornada(
   if (proximoElo && faixa.ordem === proximoElo.ordem) {
     return "PROXIMO_ELO";
   }
+  // Faixa acima do elo atual mas dentro do recorde: o estudante ja passou por ela e
+  // perdeu por inatividade, entao continua conquistada (nao "bloqueada").
+  if (faixa.ordem <= maiorElo.ordem) {
+    return "CONQUISTADO";
+  }
   if (faixa.ordem === totalFaixas) {
     return "ELO_MAXIMO";
   }
@@ -171,33 +155,39 @@ function calcularStatusFaixaJornada(
 /**
  * Monta a lista completa das faixas de elo com o progresso do estudante em cada uma.
  *
- * @param xpTotal XP acumulado do estudante.
+ * `maiorElo` entra no calculo porque, depois de um rebaixamento, as faixas acima do elo
+ * atual mas dentro do recorde seguem conquistadas — e a mesma garantia que a tela
+ * "Maior elo (conquista preservada)" anuncia.
+ *
+ * @param xpElo XP de elo do estudante (base das faixas).
  * @param eloAtual Faixa de elo atual do estudante.
  * @param proximoElo Proxima faixa de elo (ou null se estiver no ultimo elo).
  * @param percentualNoEloAtual Percentual de avanco dentro da faixa atual (0 a 100).
  * @param faixas Lista de faixas configuradas.
+ * @param maiorElo Maior faixa ja conquistada (padrao: o proprio elo atual).
  * @returns Lista ordenada de todas as faixas para a jornada de elos.
  */
 export function montarJornadaElos(
-  xpTotal: number,
+  xpElo: number,
   eloAtual: FaixaEloDto,
   proximoElo: FaixaEloDto | null,
   percentualNoEloAtual: number,
   faixas: readonly FaixaEloDto[] = FAIXAS_ELO,
+  maiorElo: FaixaEloDto = eloAtual,
 ): EloJornadaDto[] {
-  const xp = Math.max(0, Math.floor(xpTotal));
+  const xp = Math.max(0, Math.floor(xpElo));
 
   return faixas.map((faixa, index) => {
-    const status = calcularStatusFaixaJornada(faixa, eloAtual, proximoElo, faixas.length);
-    const conquistado = faixa.ordem < eloAtual.ordem;
+    const status = calcularStatusFaixaJornada(faixa, eloAtual, proximoElo, faixas.length, maiorElo);
+    const conquistado = faixa.ordem < eloAtual.ordem || faixa.ordem <= maiorElo.ordem;
     const ehAtual = faixa.ordem === eloAtual.ordem;
     const eloAnterior = index > 0 ? faixas[index - 1] : null;
 
     let percentual = 0;
-    if (conquistado) {
-      percentual = 100;
-    } else if (ehAtual) {
+    if (ehAtual) {
       percentual = percentualNoEloAtual;
+    } else if (conquistado) {
+      percentual = 100;
     }
 
     const xpFaltante = faixa.ordem <= eloAtual.ordem ? 0 : Math.max(0, faixa.xpMinimo - xp);
@@ -215,48 +205,60 @@ export function montarJornadaElos(
 }
 
 /**
- * Monta o retrato completo da progressao do usuario: nivel, elo atual, maior elo,
- * proximo elo, XP faltante e todas as faixas da jornada.
+ * Monta o retrato completo da progressao do usuario: nivel (pelo XP total), elo atual
+ * e maior elo (pelo estado persistido), proximo elo, XP faltante, todas as faixas da
+ * jornada e o estado de inatividade.
  *
- * @param xpTotal XP acumulado do usuario.
- * @param maiorEloSalvo Maior elo ja persistido no banco (garante nao-regressao).
+ * Desde a US #89 o elo nao e mais derivado do XP total: ele vive em `eloAtual`, pode cair
+ * por inatividade e tem o proprio saldo (`xpElo`). `maiorElo` e so o recorde preservado.
+ *
+ * @param dados XP total, XP de elo, elo atual e maior elo conquistado.
+ * @param inatividade Estado, contagem de dias e prazo para o proximo rebaixamento.
  * @param faixas Faixas configuradas (permite injecao em testes de alteracao de faixas).
- * @returns Dados completos de nivel e elo.
+ * @returns Dados completos de nivel, elo e inatividade.
  */
 export function montarProgressoNivel(
-  xpTotal: number,
-  maiorEloSalvo?: EloXp | null,
+  dados: DadosProgressoElo,
+  inatividade: RetratoInatividade,
   faixas: readonly FaixaEloDto[] = FAIXAS_ELO,
 ): ProgressoNivelDto {
-  const xp = Math.max(0, Math.floor(xpTotal));
+  const xp = Math.max(0, Math.floor(dados.xpTotal));
+  const xpElo = Math.max(0, Math.floor(dados.xpElo));
   const nivel = calcularNivel(xp);
   const inicioDoNivel = xpAcumuladoParaNivel(nivel);
   const inicioDoProximo = xpAcumuladoParaNivel(nivel + 1);
   const xpNecessarioNoNivel = inicioDoProximo - inicioDoNivel;
   const xpNoNivel = xp - inicioDoNivel;
 
-  const eloAtual = resolverFaixaElo(xp, maiorEloSalvo, faixas);
+  const eloAtual = obterFaixaEloPorCodigo(dados.eloAtual, faixas);
+  const maiorElo = obterFaixaEloPorCodigo(dados.maiorElo, faixas);
   const proximoElo = faixas.find((faixa) => faixa.ordem === eloAtual.ordem + 1) ?? null;
 
-  let xpNoElo = Math.max(0, xp - eloAtual.xpMinimo);
+  let xpNoElo = Math.max(0, xpElo - eloAtual.xpMinimo);
   let xpNecessarioNoElo: number | null = null;
   let xpFaltanteProximoElo = 0;
   let percentualElo = 100;
 
   if (proximoElo) {
     xpNecessarioNoElo = proximoElo.xpMinimo - eloAtual.xpMinimo;
-    xpFaltanteProximoElo = Math.max(0, proximoElo.xpMinimo - xp);
-    // Se o estudante manteve um elo maior apos reajuste das faixas e seu XP
-    // está abaixo do minimo da faixa preservada, xpNoElo fica 0 e percentual 0.
-    xpNoElo = Math.max(0, Math.min(xpNecessarioNoElo, xp - eloAtual.xpMinimo));
+    xpFaltanteProximoElo = Math.max(0, proximoElo.xpMinimo - xpElo);
+    xpNoElo = Math.max(0, Math.min(xpNecessarioNoElo, xpElo - eloAtual.xpMinimo));
     percentualElo =
       xpNecessarioNoElo > 0 ? Math.min(100, Math.round((xpNoElo / xpNecessarioNoElo) * 100)) : 100;
   }
 
-  const todosOsElos = montarJornadaElos(xp, eloAtual, proximoElo, percentualElo, faixas);
+  const todosOsElos = montarJornadaElos(
+    xpElo,
+    eloAtual,
+    proximoElo,
+    percentualElo,
+    faixas,
+    maiorElo,
+  );
 
   return {
     xpTotal: xp,
+    xpElo,
     nivel,
     proximoNivel: nivel + 1,
     xpNoNivel,
@@ -264,15 +266,21 @@ export function montarProgressoNivel(
     xpFaltante: inicioDoProximo - xp,
     percentual: Math.floor((xpNoNivel / xpNecessarioNoNivel) * 100),
     eloAtual,
-    // Na tela "Minha progressao" (Figma), "Elo atual" e "Maior elo (Conquista preservada)"
-    // sao exibidos em cards distintos. Pela regra de nao-regressao (o estudante nunca
-    // perde um elo ja conquistado), o elo ativo resolvido coincide sempre com o maior elo.
-    maiorElo: eloAtual,
+    maiorElo,
     proximoElo,
     xpNoElo,
     xpNecessarioNoElo,
     xpFaltanteProximoElo,
     percentualElo,
     todosOsElos,
+    estadoElo: inatividade.estado,
+    diasInatividade: inatividade.diasInatividade,
+    diasParaAviso: inatividade.diasParaAviso,
+    ultimaAtividadeEm: inatividade.ultimaAtividadeEm
+      ? inatividade.ultimaAtividadeEm.toISOString()
+      : null,
+    prazoRebaixamentoEm: inatividade.prazoRebaixamentoEm
+      ? inatividade.prazoRebaixamentoEm.toISOString()
+      : null,
   };
 }
