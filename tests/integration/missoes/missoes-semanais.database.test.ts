@@ -51,6 +51,6 @@ suite("missões semanais no PostgreSQL", () => {
     });
     expect(missao.progresso).toBe(20);
     expect(missao.transacaoXp?.quantidade).toBe(100);
-    expect(await prisma.transacaoXp.count({ where: { usuarioId: usuario } })).toBe(1);
+    expect(await prisma.transacaoXp.count({ where: { missaoUsuarioId: missao.id } })).toBe(1);
   });
 });
