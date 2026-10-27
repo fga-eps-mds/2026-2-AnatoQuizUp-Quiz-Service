@@ -310,6 +310,50 @@ export class QuizRepository {
     paginacao: ParametrosPaginacao,
     filtros: FiltroListarQuestoesQueryDto,
   ) {
+    if (filtros.somenteErros) {
+      const condicoes = [
+        Prisma.sql`r."usuarioId" = ${usuarioId}`,
+        Prisma.sql`r."excluidoEm" IS NULL`,
+        Prisma.sql`q."excluidoEm" IS NULL`,
+        Prisma.sql`q."status" = 'ATIVO'`,
+        Prisma.sql`r."respostaMarcada" <> q."respostaCorreta"`,
+      ];
+      if (filtros.tema) {
+        condicoes.push(Prisma.sql`LOWER(t."nome") = LOWER(${filtros.tema})`);
+      }
+      if (filtros.dificuldade) {
+        condicoes.push(Prisma.sql`q."dificuldade"::text = ${filtros.dificuldade}`);
+      }
+      if (filtros.tipo) {
+        condicoes.push(Prisma.sql`q."tipoQuestao"::text = ${filtros.tipo}`);
+      }
+      const filtro = Prisma.join(condicoes, " AND ");
+      const base = Prisma.sql`FROM "resolucoes_questoes" r
+        JOIN "questoes" q ON q."id" = r."questaoId"
+        JOIN "temas" t ON t."id" = q."temaId"
+        WHERE ${filtro}`;
+      const [ids, contagem] = await Promise.all([
+        prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+          SELECT r."id" ${base}
+          ORDER BY r."criadoEm" DESC, r."id" DESC
+          LIMIT ${paginacao.limit} OFFSET ${paginacao.skip}`),
+        prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+          SELECT COUNT(*)::int AS total ${base}`),
+      ]);
+      if (ids.length === 0) return { data: [], total: contagem[0]?.total ?? 0 };
+      const registros = await prisma.resolucaoQuestao.findMany({
+        where: { id: { in: ids.map((item) => item.id) } },
+        select: selectListarQuestoesRespondidas,
+      });
+      const porId = new Map(registros.map((item) => [item.id, item]));
+      return {
+        data: ids.flatMap((item) => {
+          const registro = porId.get(item.id);
+          return registro ? [registro] : [];
+        }),
+        total: contagem[0]?.total ?? 0,
+      };
+    }
     const where: Prisma.ResolucaoQuestaoWhereInput = {
       usuarioId,
       excluidoEm: null,
