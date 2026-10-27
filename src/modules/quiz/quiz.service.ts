@@ -326,7 +326,7 @@ export class QuizService {
     );
 
     if (!data || data.length === 0) {
-      return { dados: [], metadados: montarMetadadosPaginacao(paginacao, 0) };
+      return { dados: [], metadados: montarMetadadosPaginacao(paginacao, total) };
     }
 
     const dados = data.map((item) => {
