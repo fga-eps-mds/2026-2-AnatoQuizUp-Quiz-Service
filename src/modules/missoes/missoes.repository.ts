@@ -1,8 +1,8 @@
 import { randomInt } from "node:crypto";
-import { OrigemXp, TipoMissao, type Dificuldade, type Prisma } from "@prisma/client";
+import { OrigemXp, PeriodicidadeMissao, TipoMissao, type Dificuldade, type Prisma } from "@prisma/client";
 import { prisma } from "@/config/db";
 import { creditarXp } from "@/modules/progressao/elo.repository";
-import { periodoDiario } from "./periodo";
+import { periodoDiario, periodoSemanal } from "./periodo";
 
 type Tx = Prisma.TransactionClient;
 
@@ -11,14 +11,23 @@ export async function bloquearMissoes(tx: Tx, usuarioId: string) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${usuarioId}, 84))`;
 }
 
-async function obterPeriodo(tx: Tx, usuarioId: string, agora: Date) {
-  const { inicio, fim } = periodoDiario(agora);
+function intervaloDaPeriodicidade(agora: Date, periodicidade: PeriodicidadeMissao) {
+  return periodicidade === PeriodicidadeMissao.SEMANAL ? periodoSemanal(agora) : periodoDiario(agora);
+}
+
+async function obterPeriodo(
+  tx: Tx,
+  usuarioId: string,
+  agora: Date,
+  periodicidade: PeriodicidadeMissao,
+) {
+  const { inicio, fim } = intervaloDaPeriodicidade(agora, periodicidade);
   let periodo = await tx.periodoMissoes.findUnique({
-    where: { usuarioId_periodicidade_inicio: { usuarioId, periodicidade: "DIARIA", inicio } },
+    where: { usuarioId_periodicidade_inicio: { usuarioId, periodicidade, inicio } },
   });
   if (periodo) return periodo;
   const catalogo = await tx.missaoCatalogo.findMany({
-    where: { ativa: true, periodicidade: "DIARIA" },
+    where: { ativa: true, periodicidade },
     orderBy: { codigo: "asc" },
   });
   // Um catálogo incompleto não deve criar atribuições parciais e permanentes.
@@ -30,6 +39,7 @@ async function obterPeriodo(tx: Tx, usuarioId: string, agora: Date) {
   periodo = await tx.periodoMissoes.create({
     data: {
       usuarioId,
+      periodicidade,
       inicio,
       fim,
       missoes: { create: catalogo.slice(0, 3).map((missao) => ({ missaoId: missao.id })) },
@@ -89,23 +99,25 @@ export async function contabilizarResposta(
   correta: boolean,
   agora: Date,
 ) {
-  const periodo = await obterPeriodo(tx, usuarioId, agora);
-  if (!periodo) return [];
-  const evento = await tx.eventoMissao.createMany({
-    data: [{ periodoId: periodo.id, tipo: "RESPOSTA", chave: questaoId }],
-    skipDuplicates: true,
-  });
-  return evento.count
-    ? avancar(
-        tx,
-        periodo.id,
-        usuarioId,
-        correta
-          ? [TipoMissao.RESPONDER_QUESTOES, TipoMissao.ACERTAR_QUESTOES]
-          : [TipoMissao.RESPONDER_QUESTOES],
-        agora,
-      )
-    : [];
+  const concluidas = [];
+  for (const periodicidade of [PeriodicidadeMissao.DIARIA, PeriodicidadeMissao.SEMANAL]) {
+    const periodo = await obterPeriodo(tx, usuarioId, agora, periodicidade);
+    if (!periodo) continue;
+    const evento = await tx.eventoMissao.createMany({
+      data: [{ periodoId: periodo.id, tipo: "RESPOSTA", chave: questaoId }],
+      skipDuplicates: true,
+    });
+    if (evento.count) concluidas.push(...await avancar(
+      tx,
+      periodo.id,
+      usuarioId,
+      correta
+        ? [TipoMissao.RESPONDER_QUESTOES, TipoMissao.ACERTAR_QUESTOES]
+        : [TipoMissao.RESPONDER_QUESTOES],
+      agora,
+    ));
+  }
+  return concluidas;
 }
 
 export async function contabilizarQuiz(
@@ -115,25 +127,30 @@ export async function contabilizarQuiz(
   dificuldade: Dificuldade | null,
   agora: Date,
 ) {
-  const periodo = await obterPeriodo(tx, usuarioId, agora);
-  if (!periodo) return [];
   // Filtros ausentes formam uma combinação própria; tema é comparado sem diferença de caixa.
   const chave = JSON.stringify([tema?.trim().toLocaleLowerCase("pt-BR") ?? null, dificuldade]);
-  const evento = await tx.eventoMissao.createMany({
-    data: [{ periodoId: periodo.id, tipo: "QUIZ", chave }],
-    skipDuplicates: true,
-  });
-  return evento.count
-    ? avancar(tx, periodo.id, usuarioId, [TipoMissao.CONCLUIR_QUIZZES], agora)
-    : [];
+  const concluidas = [];
+  for (const periodicidade of [PeriodicidadeMissao.DIARIA, PeriodicidadeMissao.SEMANAL]) {
+    const periodo = await obterPeriodo(tx, usuarioId, agora, periodicidade);
+    if (!periodo) continue;
+    const evento = await tx.eventoMissao.createMany({
+      data: [{ periodoId: periodo.id, tipo: "QUIZ", chave }],
+      skipDuplicates: true,
+    });
+    if (evento.count) concluidas.push(...await avancar(tx, periodo.id, usuarioId, [TipoMissao.CONCLUIR_QUIZZES], agora));
+  }
+  return concluidas;
 }
 
-export async function listarMissoes(usuarioId: string) {
+export async function listarMissoes(
+  usuarioId: string,
+  periodicidade: PeriodicidadeMissao = PeriodicidadeMissao.DIARIA,
+) {
   return prisma.$transaction(async (tx) => {
     await bloquearMissoes(tx, usuarioId);
     const agora = new Date();
-    const intervalo = periodoDiario(agora);
-    const periodo = await obterPeriodo(tx, usuarioId, agora);
+    const intervalo = intervaloDaPeriodicidade(agora, periodicidade);
+    const periodo = await obterPeriodo(tx, usuarioId, agora, periodicidade);
     const itens = periodo
       ? await tx.missaoUsuario.findMany({
           where: { periodoId: periodo.id },
@@ -153,13 +170,16 @@ export async function listarMissoes(usuarioId: string) {
       status: concluidaEm ? "CONCLUIDA" : "EM_ANDAMENTO",
       concluidaEm,
     }));
+    const xpGanhoNoPeriodo = missoes.reduce((s, m) => s + (m.concluidaEm ? m.recompensaXp : 0), 0);
     return {
       periodo: intervalo,
+      periodicidade,
       missoes,
       resumo: {
         concluidas: missoes.filter((m) => m.status === "CONCLUIDA").length,
         total: missoes.length,
-        xpGanhoHoje: missoes.reduce((s, m) => s + (m.concluidaEm ? m.recompensaXp : 0), 0),
+        xpGanhoHoje: periodicidade === PeriodicidadeMissao.DIARIA ? xpGanhoNoPeriodo : 0,
+        xpGanhoNoPeriodo,
       },
     };
   });

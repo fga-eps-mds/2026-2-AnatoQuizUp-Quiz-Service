@@ -36,3 +36,16 @@ export function periodoDiario(instante: Date) {
     fusoHorario: FUSO,
   };
 }
+
+// Semana civil de segunda-feira a segunda-feira no fuso de Brasília.
+export function periodoSemanal(instante: Date) {
+  const [ano, mes, dia] = chaveLocal(instante).split("-").map(Number);
+  const dataCivil = new Date(Date.UTC(ano, mes - 1, dia));
+  const diasDesdeSegunda = (dataCivil.getUTCDay() + 6) % 7;
+  const segunda = new Date(Date.UTC(ano, mes - 1, dia - diasDesdeSegunda));
+  return {
+    inicio: inicioDaData(segunda.getUTCFullYear(), segunda.getUTCMonth() + 1, segunda.getUTCDate()),
+    fim: inicioDaData(segunda.getUTCFullYear(), segunda.getUTCMonth() + 1, segunda.getUTCDate() + 7),
+    fusoHorario: FUSO,
+  };
+}
