@@ -76,7 +76,7 @@ suite("missões diárias no PostgreSQL", () => {
   it("considera só a primeira resposta e credita a missão uma vez", async () => {
     const { inicio } = periodoDiario(agora);
     const periodo = await prisma.periodoMissoes.findFirstOrThrow({
-      where: { usuarioId: usuario, inicio },
+      where: { usuarioId: usuario, periodicidade: "DIARIA", inicio },
     });
     await prisma.missaoUsuario.deleteMany({ where: { periodoId: periodo.id } });
     const catalogo = await prisma.missaoCatalogo.findUniqueOrThrow({
@@ -128,7 +128,7 @@ suite("missões diárias no PostgreSQL", () => {
     expect(await prisma.resolucaoQuestao.count({ where: { usuarioId: aluno } })).toBe(1);
     expect(
       await prisma.eventoMissao.count({
-        where: { periodo: { usuarioId: aluno }, chave: questao.id },
+        where: { periodo: { usuarioId: aluno, periodicidade: "DIARIA" }, chave: questao.id },
       }),
     ).toBe(1);
     const alunoFalha = `${usuario}-rollback`;
@@ -173,7 +173,9 @@ suite("missões diárias no PostgreSQL", () => {
       await prisma.transacaoXp.count({ where: { usuarioId: aluno, origem: "QUIZ_CONCLUIDO" } }),
     ).toBe(1);
     expect(
-      await prisma.eventoMissao.count({ where: { periodo: { usuarioId: aluno }, tipo: "QUIZ" } }),
+      await prisma.eventoMissao.count({
+        where: { periodo: { usuarioId: aluno, periodicidade: "DIARIA" }, tipo: "QUIZ" },
+      }),
     ).toBe(1);
   });
 
@@ -185,7 +187,7 @@ suite("missões diárias no PostgreSQL", () => {
       await contabilizarQuiz(tx, usuario, "cardio", "FACIL", amanha);
     });
     const periodo = await prisma.periodoMissoes.findFirstOrThrow({
-      where: { usuarioId: usuario, inicio: periodoDiario(amanha).inicio },
+      where: { usuarioId: usuario, periodicidade: "DIARIA", inicio: periodoDiario(amanha).inicio },
       include: { eventos: true },
     });
     expect(periodo.eventos).toHaveLength(1);
