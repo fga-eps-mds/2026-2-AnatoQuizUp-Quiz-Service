@@ -14,10 +14,26 @@ suite("missões semanais no PostgreSQL", () => {
     await prisma.eventoMissao.deleteMany({ where: { periodo: { usuarioId: usuario } } });
     await prisma.missaoUsuario.deleteMany({ where: { periodo: { usuarioId: usuario } } });
     await prisma.periodoMissoes.deleteMany({ where: { usuarioId: usuario } });
+    await prisma.missaoCatalogo.updateMany({
+      where: { periodicidade: PeriodicidadeMissao.SEMANAL },
+      data: { ativa: false },
+    });
     await prisma.$disconnect();
   });
 
   it("renova por semana, deduplica respostas e credita XP uma vez", async () => {
+    await prisma.missaoCatalogo.updateMany({
+      where: { periodicidade: PeriodicidadeMissao.SEMANAL },
+      data: { ativa: false },
+    });
+    const antesDaAtivacao = await listarMissoes(usuario, PeriodicidadeMissao.SEMANAL);
+    expect(antesDaAtivacao.missoes).toHaveLength(0);
+
+    // Simula a ativação coordenada depois que a tela Web estiver publicada.
+    await prisma.missaoCatalogo.updateMany({
+      where: { periodicidade: PeriodicidadeMissao.SEMANAL },
+      data: { ativa: true },
+    });
     const [primeira, segunda] = await Promise.all([
       listarMissoes(usuario, PeriodicidadeMissao.SEMANAL),
       listarMissoes(usuario, PeriodicidadeMissao.SEMANAL),
