@@ -407,4 +407,52 @@ describe("Testa QuizRepository", () => {
     expect(parametros).toContain("aluno-autenticado");
     expect(parametros).toContain("Neuroanatomia");
   });
+
+  test("deve aplicar todos os filtros e preservar o total quando a página de erros estiver vazia", async () => {
+    const queryRaw = prisma.$queryRaw as jest.Mock;
+    queryRaw.mockResolvedValueOnce([]);
+    queryRaw.mockResolvedValueOnce([{ total: 7 }]);
+
+    const resposta = await repository.listarQuestoesRespondidas(
+      "aluno-autenticado",
+      { skip: 10, limit: 10, page: 2 },
+      {
+        somenteErros: true,
+        tema: "Neuroanatomia",
+        dificuldade: DIFICULDADE_API.DIFICIL,
+        tipo: TIPO_QUESTAO_API.CERTO_ERRADO,
+      },
+    );
+
+    expect(resposta).toEqual({ data: [], total: 7 });
+    expect(prisma.resolucaoQuestao.findMany).not.toHaveBeenCalled();
+
+    const parametros = queryRaw.mock.calls[0][0].values;
+    expect(parametros).toEqual(
+      expect.arrayContaining([
+        "aluno-autenticado",
+        "Neuroanatomia",
+        DIFICULDADE_API.DIFICIL,
+        TIPO_QUESTAO_API.CERTO_ERRADO,
+        10,
+      ]),
+    );
+  });
+
+  test("deve ignorar ids que deixaram de existir durante a hidratação do histórico de erros", async () => {
+    const queryRaw = prisma.$queryRaw as jest.Mock;
+    queryRaw.mockResolvedValueOnce([{ id: "erro-existente" }, { id: "erro-removido" }]);
+    queryRaw.mockResolvedValueOnce([]);
+    (prisma.resolucaoQuestao.findMany as jest.Mock).mockResolvedValue([
+      { id: "erro-existente" },
+    ]);
+
+    const resposta = await repository.listarQuestoesRespondidas(
+      "aluno-autenticado",
+      { skip: 0, limit: 2, page: 1 },
+      { somenteErros: true },
+    );
+
+    expect(resposta).toEqual({ data: [{ id: "erro-existente" }], total: 0 });
+  });
 });
