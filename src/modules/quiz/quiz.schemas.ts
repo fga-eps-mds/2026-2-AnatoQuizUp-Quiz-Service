@@ -48,6 +48,8 @@ export const schemaResponderQuestaoQuiz = z.discriminatedUnion("tipo", [
 export const schemaHistoricoQuizQuestoesUsuario = z.object({
   tema: z.string().trim().optional(),
 
+  somenteErros: z.enum(["true", "false"]).transform((valor) => valor === "true").optional(),
+
   dificuldade: z.enum(VALORES_DIFICULDADE).optional(),
 
   tipo: z.enum([TIPO_QUESTAO_API.MULTIPLA_ESCOLHA, TIPO_QUESTAO_API.CERTO_ERRADO]).optional(),

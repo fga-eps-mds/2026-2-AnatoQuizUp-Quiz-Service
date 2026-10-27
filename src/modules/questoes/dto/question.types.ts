@@ -77,6 +77,7 @@ export type ListarQuestoesQueryDto = {
 export type FiltroListarQuestoesQueryDto = {
   page?: number;
   limit?: number;
+  somenteErros?: boolean;
   tema?: string;
   dificuldade?: DificuldadeApi;
   tipo?: TipoQuestaoApi;
