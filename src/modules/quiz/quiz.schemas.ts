@@ -56,3 +56,12 @@ export const schemaHistoricoQuizQuestoesUsuario = z.object({
 
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
+
+// A consulta administrativa usa instantes com offset explícito e intervalo limitado.
+export const schemaMetricasProdutoR2 = z.object({
+  inicio: z.iso.datetime({ offset: true }),
+  fim: z.iso.datetime({ offset: true }),
+}).refine(({ inicio, fim }) => {
+  const duracao = new Date(fim).getTime() - new Date(inicio).getTime();
+  return duracao > 0 && duracao <= 90 * 24 * 60 * 60 * 1000;
+}, { message: "O intervalo deve ser positivo e ter até 90 dias." });

@@ -10,7 +10,9 @@ import {
   schemaBuscarQuestaoQuiz,
   schemaResponderQuestaoQuiz,
   schemaHistoricoQuizQuestoesUsuario,
+  schemaMetricasProdutoR2,
 } from "./quiz.schemas";
+import { buscarMetricasProdutoR2 } from "./metricas-r2";
 import { ConquistaService } from "../conquistas/conquistas.service";
 import { ConquistaRepository } from "../conquistas/conquistas.repository";
 import { UsoItemRepository } from "../loja/uso-item.repository";
@@ -54,6 +56,20 @@ quizRouter.get(
   "/historico",
   validarRequisicao(schemaHistoricoQuizQuestoesUsuario, "query"),
   quizController.buscarHistorico,
+);
+
+quizRouter.get(
+  "/metricas-r2",
+  middlewarePapeis(PAPEIS.ADMINISTRADOR),
+  validarRequisicao(schemaMetricasProdutoR2, "query"),
+  async (request, response, next) => {
+    try {
+      const { inicio, fim } = request.query as unknown as { inicio: string; fim: string };
+      return response.json(await buscarMetricasProdutoR2(new Date(inicio), new Date(fim)));
+    } catch (erro) {
+      return next(erro);
+    }
+  },
 );
 
 // Rodadas de quiz, nivel e historico de XP (/quiz/tentativas, /quiz/progresso, /quiz/xp/historico).
