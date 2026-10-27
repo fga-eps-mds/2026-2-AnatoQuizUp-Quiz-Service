@@ -62,9 +62,20 @@ describe("MinioService", () => {
   });
 
   describe("gerarUrlPublica", () => {
-    it("deve gerar URL sem porta quando estiver em produção", async () => {
+    it("usa o endpoint interno para upload e a URL HTTPS publica para leitura", async () => {
       process.env.NODE_ENV = "production";
-      process.env.MINIO_ENDPOINT = "https://s3.meudominio.com";
+      process.env.MINIO_ENDPOINT = "http://minio.railway.internal:9001";
+      process.env.MINIO_API_PORT = "9000";
+      process.env.MINIO_PUBLIC_URL = "https://assets.example.com";
+      service = new MinioService();
+
+      expect(Minio.Client).toHaveBeenLastCalledWith({
+        endPoint: "minio.railway.internal",
+        port: 9000,
+        useSSL: false,
+        accessKey: "user",
+        secretKey: "password",
+      });
 
       const mockFile = {
         originalname: "foto.jpg",
@@ -75,8 +86,15 @@ describe("MinioService", () => {
 
       const resultado = await service.uploadImagem(mockFile);
 
-      expect(resultado).toContain("https://s3.meudominio.com/anatoquizup-imagens/");
-      expect(resultado).not.toContain(":9000");
+      expect(resultado).toContain("https://assets.example.com/anatoquizup-imagens/");
+      expect(resultado).not.toContain("railway.internal");
+    });
+
+    it("recusa iniciar em producao sem URL publica HTTPS", () => {
+      process.env.NODE_ENV = "production";
+      delete process.env.MINIO_PUBLIC_URL;
+
+      expect(() => new MinioService()).toThrow("MINIO_PUBLIC_URL deve ser uma URL HTTPS publica em producao.");
     });
   });
 });

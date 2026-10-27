@@ -57,6 +57,48 @@ permanecem configuradas no serviço Railway existente.
 O CD não executa `prisma:seed:homologacao`. Esse comando reinicia dados de
 cenário e continua sendo manual, com confirmação explícita.
 
+## Restaurar imagens de questões
+
+No serviço **Quiz-Service** do Railway, configurar as variáveis abaixo antes
+de ativar o armazenamento. Inserir os valores na plataforma, sem copiá-los
+para o repositório ou para capturas de tela.
+
+| Variável | Valor esperado |
+| --- | --- |
+| `STORAGE_ENABLED` | `true` |
+| `MINIO_ENDPOINT` | URL HTTP(S) da API S3/MinIO acessível pelo Quiz-Service; para serviço privado Railway, usar o domínio privado e protocolo real |
+| `MINIO_API_PORT` | Porta da API de objetos, não a porta do console |
+| `MINIO_ROOT_USER` | Chave de acesso autorizada ao bucket |
+| `MINIO_ROOT_PASSWORD` | Chave secreta correspondente |
+| `MINIO_PUBLIC_URL` | Origem HTTPS pública que serve os objetos, sem nome do bucket e sem barra final |
+
+O bucket usado pelo serviço é `anatoquizup-imagens`. Ao iniciar, a aplicação
+cria o bucket se necessário e aplica a política de leitura pública dos objetos,
+inclusive quando o bucket já existe. O provedor precisa permitir essa operação;
+se bloquear políticas públicas, o serviço não inicia e será necessário ajustar
+a política do provedor ou usar uma origem pública/CDN compatível. A URL pública
+deve carregar no navegador sem autenticação e permitir `GET` das imagens. O
+domínio `minio-homolog.up.railway.app` é do **BFF** e não serve objetos.
+
+Após o deploy, registrar SHA e identificação do deploy, então executar com
+contas de teste autorizadas:
+
+1. Professor cria questão com PNG ou JPEG de teste (até 5 MB). Confirmar que a
+   API devolve `imagem` com origem HTTPS pública e que a URL responde com a
+   imagem correta em janela anônima.
+2. Aluno abre um quiz que contém a questão. Confirmar imagem carregada, sem
+   conteúdo misto ou erro de CORS, e concluir a resposta.
+3. Professor substitui a imagem. Confirmar que a questão e o quiz usam a URL
+   nova. Ao desativar a questão, verificar que ela deixa de ser oferecida. A
+   exclusão física do objeto não faz parte da operação atual e deve ser
+   gerenciada separadamente.
+4. Reiniciar o Quiz-Service e repetir a leitura pública de uma imagem já
+   criada, comprovando persistência do bucket.
+
+Não marcar o fluxo como validado apenas pelo health check. Guardar as
+capturas, URLs sem assinatura e resultados HTTP na evidência da R2, sem
+publicar credenciais ou imagens com dados de pacientes.
+
 ## Repetir, validar e retornar
 
 Para repetir a publicação do commit atual, use **Actions → CD - Homologação

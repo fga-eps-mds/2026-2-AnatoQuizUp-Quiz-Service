@@ -1,25 +1,31 @@
 import * as Minio from "minio";
 
+import { montarEndpointStorage } from "@/config/storage";
+
 // Servico de upload de imagens das questoes no MinIO/S3.
 export class MinioService {
   private minioClient: Minio.Client;
   private bucketName = "anatoquizup-imagens";
 
   constructor() {
-    // Endpoint sem protocolo (o cliente usa hostname puro).
-    const endpointRaw = process.env.MINIO_ENDPOINT || "localhost";
-    const cleanEndPoint = endpointRaw.replace(/^https?:\/\//, "");
+    if (process.env.NODE_ENV === "production") {
+      const publicUrl = process.env.MINIO_PUBLIC_URL;
+      if (!publicUrl || !publicUrl.startsWith("https://")) {
+        throw new Error("MINIO_PUBLIC_URL deve ser uma URL HTTPS publica em producao.");
+      }
+    }
 
-    // SSL em producao ou quando o endpoint ja vem como https.
-    const useSSL = process.env.NODE_ENV === "production" || endpointRaw.startsWith("https");
-
-    // Com SSL deixa a porta padrao; sem SSL usa a porta da API configurada.
-    const port = useSSL ? undefined : parseInt(process.env.MINIO_API_PORT || "9000", 10);
+    // O protocolo pertence ao endpoint do storage, nao ao ambiente da API.
+    // No Railway, por exemplo, a API e publica via HTTPS e o MinIO usa HTTP privado.
+    const endpoint = montarEndpointStorage(
+      process.env.MINIO_ENDPOINT || "localhost",
+      process.env.MINIO_API_PORT || "9000",
+    );
 
     this.minioClient = new Minio.Client({
-      endPoint: cleanEndPoint,
-      port: port,
-      useSSL: useSSL,
+      endPoint: endpoint.hostname,
+      port: endpoint.port,
+      useSSL: endpoint.useSSL,
       accessKey: process.env.MINIO_ROOT_USER || "",
       secretKey: process.env.MINIO_ROOT_PASSWORD || "",
     });
@@ -44,18 +50,14 @@ export class MinioService {
     const publicUrl = process.env.MINIO_PUBLIC_URL;
     if (publicUrl) {
       const base = publicUrl.replace(/\/$/, "");
-      return `${base}/${this.bucketName}/${nomeArquivo}`;
+      return `${base}/${this.bucketName}/${encodeURIComponent(nomeArquivo)}`;
     }
 
-    const endpointRaw = process.env.MINIO_ENDPOINT;
-
-    // Em producao o endpoint ja inclui a porta/dominio final.
-    if (process.env.NODE_ENV === "production") {
-      return `${endpointRaw}/${this.bucketName}/${nomeArquivo}`;
-    }
-
-    // Em desenvolvimento concatena a porta da API explicitamente.
-    const porta = process.env.MINIO_API_PORT;
-    return `${endpointRaw}:${porta}/${this.bucketName}/${nomeArquivo}`;
+    // Sem URL publica, o fallback so e valido para desenvolvimento local.
+    const endpoint = montarEndpointStorage(
+      process.env.MINIO_ENDPOINT || "localhost",
+      process.env.MINIO_API_PORT || "9000",
+    );
+    return `${endpoint.s3Endpoint}/${this.bucketName}/${encodeURIComponent(nomeArquivo)}`;
   }
 }

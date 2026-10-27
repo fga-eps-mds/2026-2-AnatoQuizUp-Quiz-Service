@@ -94,25 +94,24 @@ export async function configurarStorage() {
     if (!existe) {
       console.log(`[Storage] Criando bucket "${bucketName}"...`);
       await minioAdmin.makeBucket(bucketName);
-
-      // Politica que torna os objetos do bucket publicos para leitura (GET).
-      const policy = {
-        Version: "2012-10-17",
-        Statement: [
-          {
-            Action: ["s3:GetObject"],
-            Effect: "Allow",
-            Principal: "*",
-            Resource: [`arn:aws:s3:::${bucketName}/*`],
-          },
-        ],
-      };
-
-      await minioAdmin.setBucketPolicy(bucketName, JSON.stringify(policy));
-      console.log(`[Storage] Bucket "${bucketName}" configurado como público.`);
-    } else {
-      console.log(`[Storage] Infraestrutura pronta.`);
     }
+
+    // O bucket pode ja existir sem permissao de leitura (caso comum em
+    // homologacao). Reaplicar a politica torna o estado verificavel a cada boot.
+    const policy = {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Action: ["s3:GetObject"],
+          Effect: "Allow",
+          Principal: "*",
+          Resource: [`arn:aws:s3:::${bucketName}/*`],
+        },
+      ],
+    };
+
+    await minioAdmin.setBucketPolicy(bucketName, JSON.stringify(policy));
+    console.log(`[Storage] Bucket "${bucketName}" pronto para leitura publica.`);
   } catch (error) {
     console.error("[Storage] Erro detalhado:", error);
     throw new Error(`[Storage] Falha crítica: ${error}`);

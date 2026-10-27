@@ -57,6 +57,19 @@ describe("Storage Configuration", () => {
     expect(minioAdmin.setBucketPolicy).toHaveBeenCalled();
   });
 
+  it("reaplica permissao de leitura quando o bucket ja existe", async () => {
+    const minioAdmin = criarMinioMock(true);
+    const { configurarStorage } = await carregarStorage({}, minioAdmin);
+
+    await configurarStorage();
+
+    expect(minioAdmin.makeBucket).not.toHaveBeenCalled();
+    expect(minioAdmin.setBucketPolicy).toHaveBeenCalledWith(
+      "anatoquizup-imagens",
+      expect.stringContaining('"s3:GetObject"'),
+    );
+  });
+
   it("nao inicializa o MinIO quando o storage esta desabilitado", async () => {
     const minioAdmin = criarMinioMock();
     const { configurarStorage } = await carregarStorage(
