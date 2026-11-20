@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { TurmaDashboardController } from '../../../src/modules/dashboardTurma/dashboardTurma.controller';
 import { TurmaDashboardService } from '../../../src/modules/dashboardTurma/dashboardTurma.service';
 import type { TurmaDashboardRepository } from '../../../src/modules/dashboardTurma/dashboardTurma.repository';
+import { ErroAplicacao } from '../../../src/shared/errors/erro-aplicacao';
 
 jest.mock('../../../src/modules/dashboardTurma/dashboardTurma.service');
 
@@ -249,6 +250,70 @@ describe('TurmaDashboardController', () => {
       expect(res.json).toHaveBeenCalledWith({
         error: 'Lista não encontrada ou não pertence a esta turma.',
       });
+    });
+  });
+
+  describe('detalharEntrega', () => {
+    it('deve retornar o detalhe da entrega para o professor autenticado', async () => {
+      const req = {
+        params: {
+          id: 'cmpsx9a2f00064hx26j7kukdo',
+          listaId: 'cmq101jjt002w4hitmlzi7d3g',
+          alunoId: 'cmq101jjt002w4hitmlzi7d3h',
+        },
+        usuario: { id: 'prof-123' },
+      } as unknown as Request;
+      const res = createMockResponse();
+      const mockData = {
+        lista: { id: 'cmq101jjt002w4hitmlzi7d3g', nome: 'Lista de neuro', publicadaEm: '2026-11-18T10:00:00.000Z' },
+        alunoId: 'cmq101jjt002w4hitmlzi7d3h',
+        resumo: { totalQuestoes: 1, acertos: 1, erros: 0, naoRespondidas: 0, taxaAcerto: 100 },
+        questoes: [],
+      };
+
+      serviceMock.getDetalheEntrega.mockResolvedValue(mockData);
+
+      await controller.detalharEntrega(req, res);
+
+      expect(serviceMock.getDetalheEntrega).toHaveBeenCalledWith(
+        'cmpsx9a2f00064hx26j7kukdo',
+        'cmq101jjt002w4hitmlzi7d3g',
+        'cmq101jjt002w4hitmlzi7d3h',
+        'prof-123',
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(mockData);
+    });
+
+    it('deve retornar 401 sem professor autenticado', async () => {
+      const req = {
+        params: { id: 'turma-1', listaId: 'lista-1', alunoId: 'aluno-1' },
+      } as unknown as Request;
+      const res = createMockResponse();
+
+      await controller.detalharEntrega(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Usuário não autenticado ou sessão expirada.' });
+    });
+
+    it('deve retornar o erro de autorização ou entrega inexistente', async () => {
+      const req = {
+        params: { id: 'turma-1', listaId: 'lista-1', alunoId: 'aluno-1' },
+        usuario: { id: 'prof-123' },
+      } as unknown as Request;
+      const res = createMockResponse();
+
+      serviceMock.getDetalheEntrega.mockRejectedValue(new ErroAplicacao({
+        mensagem: 'Entrega não encontrada ou sem permissão de acesso.',
+        codigo: 'NAO_ENCONTRADO',
+        codigoStatus: 404,
+      }));
+
+      await controller.detalharEntrega(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Entrega não encontrada ou sem permissão de acesso.' });
     });
   });
 });
