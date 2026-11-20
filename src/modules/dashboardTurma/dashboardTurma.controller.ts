@@ -111,4 +111,38 @@ export class TurmaDashboardController {
       return res.status(500).json({ error: 'Erro ao buscar desempenho dos alunos na lista.' });
     }
   };
+
+
+  /**
+   * GET top erros dos alunos em uma lista especifica.
+   *
+   * @param req Requisicao com o id da turma e o listaId na rota.
+   * @param res Resposta HTTP (200 com o ranking de erros; 404 se a lista nao pertence a turma).
+   */
+  getTopErros = async (req: Request, res: Response) => {
+    try {
+      const turmaId = req.params.id as string;
+      const listaTurmaId = req.params.listaId as string;
+      const professorId = req.usuario?.id;
+
+      // Validação de segurança: exige professor autenticado.
+      if (!professorId) {
+        return res.status(401).json({ error: 'Usuário não autenticado ou sessão expirada.' });
+      }
+
+      const resultado = await this.service.getTopQuestoesComMaisErros(turmaId, listaTurmaId);
+
+      return res.status(200).json(resultado);
+    } catch (error: unknown) {
+      console.error('Erro no TurmaDashboardController [top-erros]:', error);
+
+      // Tratamento de erro específico conforme definido no Service
+      if (error instanceof Error && error.message === 'Lista não encontrada ou não pertence a esta turma.') {
+        return res.status(404).json({ error: error.message });
+      }
+
+      return res.status(500).json({ error: 'Erro interno ao buscar as questões com mais erros.' });
+    }
+  };
 }
+
