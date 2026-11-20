@@ -116,4 +116,44 @@ export class TurmaDashboardRepository {
       },
     });
   }
+
+  /**
+   * Busca uma entrega submetida para consulta do professor responsavel pela turma.
+   * O filtro unico impede a consulta de alunos, listas ou turmas sem vinculo.
+   */
+  async findEntregaDoAluno(
+    turmaId: string,
+    listaTurmaId: string,
+    alunoId: string,
+    professorId: string,
+  ) {
+    return prisma.listaTurma.findFirst({
+      where: {
+        id: listaTurmaId,
+        turmaId,
+        turma: {
+          professorId,
+          alunos: { some: { alunoId } },
+        },
+      },
+      include: {
+        listaQuestao: {
+          include: {
+            itens: {
+              orderBy: { ordem: 'asc' },
+              include: {
+                questao: {
+                  include: { alternativas: true },
+                },
+              },
+            },
+          },
+        },
+        resolucoes: {
+          where: { alunoId, status: 'SUBMETIDA' },
+          include: { respostas: true },
+        },
+      },
+    });
+  }
 }

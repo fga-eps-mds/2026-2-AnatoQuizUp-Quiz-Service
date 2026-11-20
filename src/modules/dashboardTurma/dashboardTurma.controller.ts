@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import type { TurmaDashboardService } from './dashboardTurma.service';
+import { ErroAplicacao } from '@/shared/errors/erro-aplicacao';
 
 // Controller HTTP do dashboard da turma (visao do professor): metricas macro e por aluno/lista.
 // Aqui os erros sao tratados localmente (status 401/500) em vez de delegar ao middleware.
@@ -109,6 +110,32 @@ export class TurmaDashboardController {
       }
 
       return res.status(500).json({ error: 'Erro ao buscar desempenho dos alunos na lista.' });
+    }
+  };
+
+  /** GET resultado de uma entrega especifica para o professor responsavel. */
+  detalharEntrega = async (req: Request, res: Response) => {
+    try {
+      const professorId = req.usuario?.id;
+      if (!professorId) {
+        return res.status(401).json({ error: 'Usuário não autenticado ou sessão expirada.' });
+      }
+
+      const data = await this.service.getDetalheEntrega(
+        req.params.id as string,
+        req.params.listaId as string,
+        req.params.alunoId as string,
+        professorId,
+      );
+
+      return res.status(200).json(data);
+    } catch (error) {
+      if (error instanceof ErroAplicacao) {
+        return res.status(error.codigoStatus).json({ error: error.message });
+      }
+
+      console.error('Erro no TurmaDashboardController [detalhe entrega]:', error);
+      return res.status(500).json({ error: 'Erro ao buscar detalhe da entrega.' });
     }
   };
 }

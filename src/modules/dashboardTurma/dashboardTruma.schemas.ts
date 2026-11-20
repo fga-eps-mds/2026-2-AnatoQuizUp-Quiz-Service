@@ -24,3 +24,12 @@ export const schemaParamsListaDashboard = z.object({
     message: 'Formato de ID da lista inválido.',
   }),
 });
+
+// Params do detalhamento de uma entrega: turma, publicacao e aluno consultados.
+export const schemaParamsDetalheEntrega = schemaParamsListaDashboard.extend({
+  alunoId: z.string({
+    message: 'O ID do aluno é obrigatório.',
+  }).cuid({
+    message: 'Formato de ID do aluno inválido.',
+  }),
+});
