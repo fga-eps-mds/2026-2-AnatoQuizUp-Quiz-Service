@@ -309,4 +309,148 @@ describe('TurmaDashboardService', () => {
       ).rejects.toThrow('Lista não encontrada ou não pertence a esta turma.');
     });
   });
+
+  describe('getTopQuestoesComMaisErros', () => {
+    it('retorna no máximo 3 questões, ordenadas por erros e desempate por número', async () => {
+      const mockLista = {
+        id: 'lista-turma-1',
+        turma: { professorId: 'prof-123' },
+        listaQuestao: {
+          nome: 'Lista de Anatomia',
+          itens: [
+            {
+              questaoId: 'q1',
+              ordem: 3,
+              questao: { enunciado: 'Questão 3', respostaCorreta: 'A', tema: { nome: 'Tórax' } },
+            },
+            {
+              questaoId: 'q2',
+              ordem: 1,
+              questao: { enunciado: 'Questão 1', respostaCorreta: 'B', tema: { nome: 'Cabeça' } },
+            },
+            {
+              questaoId: 'q3',
+              ordem: 2,
+              questao: { enunciado: 'Questão 2', respostaCorreta: 'C', tema: { nome: 'Abdome' } },
+            },
+            {
+              questaoId: 'q4',
+              ordem: 4,
+              questao: { enunciado: 'Questão 4', respostaCorreta: 'D', tema: { nome: 'Pelve' } },
+            },
+            {
+              questaoId: 'q5',
+              ordem: 5,
+              questao: { enunciado: 'Questão 5', respostaCorreta: 'E', tema: { nome: 'Costas' } },
+            },
+          ],
+        },
+        resolucoes: [
+          {
+            respostas: [
+              { questaoId: 'q1', respostaMarcada: 'B' },
+              { questaoId: 'q2', respostaMarcada: 'A' },
+              { questaoId: 'q3', respostaMarcada: 'C' },
+              { questaoId: 'q4', respostaMarcada: 'D' },
+              { questaoId: 'q5', respostaMarcada: 'D' },
+            ],
+          },
+          {
+            respostas: [
+              { questaoId: 'q1', respostaMarcada: 'A' },
+              { questaoId: 'q2', respostaMarcada: 'A' },
+              { questaoId: 'q3', respostaMarcada: 'C' },
+              { questaoId: 'q4', respostaMarcada: 'D' },
+              { questaoId: 'q5', respostaMarcada: 'D' },
+              { questaoId: 'fora-da-lista', respostaMarcada: 'A' },
+            ],
+          },
+        ],
+      } as unknown as Awaited<ReturnType<TurmaDashboardRepository['findRespostasParaRankingErros']>>;
+
+      repoMock.findRespostasParaRankingErros.mockResolvedValue(mockLista);
+
+      const result = await service.getTopQuestoesComMaisErros('turma-123', 'lista-turma-1', 'prof-123');
+
+      expect(result.questoes).toHaveLength(3);
+      expect(result.questoes.map((questao) => questao.questaoId)).toEqual(['q2', 'q5', 'q1']);
+      expect(result.questoes[0]).toMatchObject({
+        questaoId: 'q2',
+        numeroQuestao: 1,
+        totalErros: 2,
+        totalRespostas: 2,
+        percentualErro: 100,
+      });
+      expect(result.questoes[1]).toMatchObject({
+        questaoId: 'q5',
+        numeroQuestao: 5,
+        totalErros: 2,
+        totalRespostas: 2,
+        percentualErro: 100,
+      });
+      expect(result.questoes[2]).toMatchObject({
+        questaoId: 'q1',
+        numeroQuestao: 3,
+        totalErros: 1,
+        totalRespostas: 2,
+        percentualErro: 50,
+      });
+    });
+
+    it('retorna lista vazia quando não há erros e ignora questões sem resposta', async () => {
+      const mockLista = {
+        id: 'lista-turma-1',
+        turma: { professorId: 'prof-123' },
+        listaQuestao: {
+          nome: 'Lista sem erros',
+          itens: [
+            {
+              questaoId: 'q1',
+              ordem: 1,
+              questao: { enunciado: 'Questão 1', respostaCorreta: 'A', tema: { nome: 'Tórax' } },
+            },
+            {
+              questaoId: 'q2',
+              ordem: 2,
+              questao: { enunciado: 'Questão 2', respostaCorreta: 'B', tema: { nome: 'Abdome' } },
+            },
+          ],
+        },
+        resolucoes: [
+          {
+            respostas: [
+              { questaoId: 'q1', respostaMarcada: 'A' },
+            ],
+          },
+        ],
+      } as unknown as Awaited<ReturnType<TurmaDashboardRepository['findRespostasParaRankingErros']>>;
+
+      repoMock.findRespostasParaRankingErros.mockResolvedValue(mockLista);
+
+      const result = await service.getTopQuestoesComMaisErros('turma-123', 'lista-turma-1', 'prof-123');
+
+      expect(result.questoes).toEqual([]);
+    });
+
+    it('retorna erro quando a lista não pertence à turma', async () => {
+      repoMock.findRespostasParaRankingErros.mockResolvedValue(null);
+
+      await expect(
+        service.getTopQuestoesComMaisErros('turma-123', 'lista-errada', 'prof-123')
+      ).rejects.toThrow('Lista não encontrada ou não pertence a esta turma.');
+    });
+
+    it('retorna erro quando o professor não pertence à turma', async () => {
+      repoMock.findRespostasParaRankingErros.mockResolvedValue({
+        id: 'lista-turma-1',
+        turma: { professorId: 'prof-outro' },
+        listaQuestao: { nome: 'Lista privada', itens: [] },
+        resolucoes: [],
+      } as unknown as Awaited<ReturnType<TurmaDashboardRepository['findRespostasParaRankingErros']>>);
+
+      await expect(
+        service.getTopQuestoesComMaisErros('turma-123', 'lista-turma-1', 'prof-123')
+      ).rejects.toThrow('Lista não encontrada ou não pertence a esta turma.');
+    });
+  });
 });
