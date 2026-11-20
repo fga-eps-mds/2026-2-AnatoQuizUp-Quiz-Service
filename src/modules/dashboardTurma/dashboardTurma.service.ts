@@ -1,5 +1,7 @@
 import type { TurmaDashboardRepository } from './dashboardTurma.repository';
 import type { DesempenhoListaDTO } from './dto/dashboardTurma.types';
+import type { TopErrosResponseDTO } from './dto/dashboardTurma.types';
+import type { TopErroQuestaoDTO } from './dto/dashboardTurma.types';
 
 /**
  * Service do dashboard da turma (visao do professor).
@@ -271,4 +273,82 @@ export class TurmaDashboardService {
       desempenhoAlunos: alunos,
     };
   }
+
+  async getTopQuestoesComMaisErros(turmaId: string, listaTurmaId: string): Promise<TopErrosResponseDTO> {
+    const lista = await this.repository.findRespostasParaRankingErros(turmaId, listaTurmaId);
+
+    if (!lista) {
+      throw new Error('Lista não encontrada ou não pertence a esta turma.');
+    }
+
+    const totalAlunosResponderam = lista.resolucoes.length;
+
+    // Mapeia informações das questões para acesso rápido
+    const infoQuestoes = new Map<string, { numero: number; enunciado: string; tema: string; respostaCorreta: string }>();
+    lista.listaQuestao.itens.forEach(item => {
+      infoQuestoes.set(item.questaoId, {
+        numero: item.ordem, 
+        enunciado: item.questao.enunciado,
+        tema: item.questao.tema.nome,
+        respostaCorreta: item.questao.respostaCorreta
+      });
+    });
+
+    // Acumulador de estatísticas por questão
+    const estatisticas = new Map<string, { erros: number; totalRespostas: number }>();
+    infoQuestoes.forEach((_, questaoId) => {
+      estatisticas.set(questaoId, { erros: 0, totalRespostas: 0 });
+    });
+
+    // Processa as respostas (T05.2)
+    lista.resolucoes.forEach(resolucao => {
+      resolucao.respostas.forEach(resposta => {
+        const info = infoQuestoes.get(resposta.questaoId);
+        if (!info) return; 
+
+        const stats = estatisticas.get(resposta.questaoId)!;
+        stats.totalRespostas += 1;
+        
+        // Verifica se errou
+        if (resposta.respostaMarcada !== info.respostaCorreta) {
+          stats.erros += 1;
+        }
+      });
+    });
+
+    // Transforma em Array e calcula percentual
+    const questoesComErros = Array.from(estatisticas.entries())
+      .map(([questaoId, stats]) => {
+        const info = infoQuestoes.get(questaoId)!;
+        return {
+          questaoId,
+          numeroQuestao: info.numero,
+          enunciado: info.enunciado,
+          tema: info.tema,
+          totalErros: stats.erros,
+          totalRespostas: stats.totalRespostas,
+          percentualErro: stats.totalRespostas > 0 ? Math.round((stats.erros / stats.totalRespostas) * 100) : 0,
+        };
+      })
+      .filter(q => q.totalErros > 0); 
+
+    // Ordenação: Maior erro (desc), depois menor número da questão (asc) 
+    questoesComErros.sort((a, b) => {
+      if (b.totalErros !== a.totalErros) {
+        return b.totalErros - a.totalErros;
+      }
+      return a.numeroQuestao - b.numeroQuestao;
+    });
+
+    // Pega o Top 3
+    const top3 = questoesComErros.slice(0, 3);
+
+    return {
+      listaTurmaId: lista.id,
+      nomeLista: lista.listaQuestao.nome,
+      totalAlunosResponderam,
+      questoes: top3,
+    };
+  }
+
 }
