@@ -101,8 +101,6 @@ export class TurmaDashboardController {
     } catch (error: unknown) {
       console.error('Erro no TurmaDashboardController [lista individual]:', error);
 
-      console.error('Erro no TurmaDashboardController [lista individual]:', error);
-
       // Verificamos se é uma instância de Error antes de acessar a propriedade .message
       if (error instanceof Error && error.message === 'Lista não encontrada ou não pertence a esta turma.') {
         return res.status(404).json({ error: error.message });
