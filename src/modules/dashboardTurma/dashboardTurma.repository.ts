@@ -134,6 +134,11 @@ export class TurmaDashboardRepository {
         ]
       },
       include: {
+        turma: {
+          select: {
+            professorId: true,
+          },
+        },
         listaQuestao: {
           select: {
             nome: true,
