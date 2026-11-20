@@ -51,6 +51,7 @@ describe("Testes de Integração - Progressão (rodada de quiz e XP)", () => {
     await prisma.desbloqueioConquista.deleteMany();
     await prisma.recompensaItemConquista.deleteMany();
     await prisma.conquista.deleteMany();
+    await prisma.listaQuestaoItem.deleteMany();
     await prisma.questaoAlternativa.deleteMany();
     await prisma.questao.deleteMany();
     await prisma.tema.deleteMany();
