@@ -130,7 +130,7 @@ export class TurmaDashboardController {
         return res.status(401).json({ error: 'Usuário não autenticado ou sessão expirada.' });
       }
 
-      const resultado = await this.service.getTopQuestoesComMaisErros(turmaId, listaTurmaId);
+      const resultado = await this.service.getTopQuestoesComMaisErros(turmaId, listaTurmaId, professorId);
 
       return res.status(200).json(resultado);
     } catch (error: unknown) {
