@@ -24,6 +24,8 @@ describe("Testa Loja Controller", () => {
       listarCatalogo: jest.fn(),
       listarInventario: jest.fn(),
       comprar: jest.fn(),
+      usarItem: jest.fn(),
+      listarHistoricoUsos: jest.fn(),
       listarHistorico: jest.fn(),
     } as unknown as jest.Mocked<LojaService>;
 
@@ -219,6 +221,95 @@ describe("Testa Loja Controller", () => {
     const nextMock = jest.fn();
 
     await controller.comprar(request, response, nextMock);
+
+    expect(nextMock).toHaveBeenCalledWith(erro);
+  });
+
+  test("deve chamar next quando service lançar erro ao listar inventario", async () => {
+    const erro = new Error("Erro ao listar inventario");
+    lojaService.listarInventario.mockRejectedValue(erro);
+    const request = { usuario: { id: "usuario-id" }, query: {} } as unknown as Request;
+    const nextMock = jest.fn();
+
+    await controller.listarInventario(request, criarResponseMock().response, nextMock);
+
+    expect(nextMock).toHaveBeenCalledWith(erro);
+  });
+
+  test("deve ativar um item com sucesso", async () => {
+    const respostaMock = {
+      mensagem: "Cafe do Foco ativado. Seu proximo acerto valera ATP em dobro.",
+      quantidadeRestante: 2,
+      uso: {
+        id: "uso-id",
+        itemLojaId: "cafe-id",
+        itemNome: "Cafe do Foco",
+        efeito: "Dobra o proximo acerto.",
+        status: "ATIVO" as const,
+        ativadoEm: new Date("2026-06-16T00:00:00.000Z"),
+        aplicadoEm: null,
+        questaoId: null,
+      },
+    };
+    lojaService.usarItem.mockResolvedValue(respostaMock);
+    const request = {
+      usuario: { id: "usuario-id" },
+      body: { itemLojaId: "cafe-id" },
+    } as unknown as Request;
+    const { response, status, json } = criarResponseMock();
+
+    await controller.usarItem(request, response, next);
+
+    expect(lojaService.usarItem).toHaveBeenCalledWith("usuario-id", "cafe-id");
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json).toHaveBeenCalledWith(respostaMock);
+  });
+
+  test("deve chamar next quando service lançar erro ao usar item", async () => {
+    const erro = new Error("Erro ao usar item");
+    lojaService.usarItem.mockRejectedValue(erro);
+    const request = {
+      usuario: { id: "usuario-id" },
+      body: { itemLojaId: "cafe-id" },
+    } as unknown as Request;
+    const nextMock = jest.fn();
+
+    await controller.usarItem(request, criarResponseMock().response, nextMock);
+
+    expect(nextMock).toHaveBeenCalledWith(erro);
+  });
+
+  test("deve listar o historico de usos com sucesso", async () => {
+    const respostaMock = { dados: [], metadados: { page: 1, limit: 10, total: 0, totalPages: 0 } };
+    lojaService.listarHistoricoUsos.mockResolvedValue(respostaMock);
+    const request = { usuario: { id: "usuario-id" }, query: { page: 1, limit: 10 } } as unknown as Request;
+    const { response, status, json } = criarResponseMock();
+
+    await controller.listarHistoricoUsos(request, response, next);
+
+    expect(lojaService.listarHistoricoUsos).toHaveBeenCalledWith("usuario-id", request.query);
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json).toHaveBeenCalledWith(respostaMock);
+  });
+
+  test("deve chamar next quando service lançar erro ao listar o historico de usos", async () => {
+    const erro = new Error("Erro ao listar historico de usos");
+    lojaService.listarHistoricoUsos.mockRejectedValue(erro);
+    const request = { usuario: { id: "usuario-id" }, query: {} } as unknown as Request;
+    const nextMock = jest.fn();
+
+    await controller.listarHistoricoUsos(request, criarResponseMock().response, nextMock);
+
+    expect(nextMock).toHaveBeenCalledWith(erro);
+  });
+
+  test("deve chamar next quando service lançar erro ao listar a cronologia unificada", async () => {
+    const erro = new Error("Erro ao listar cronologia");
+    lojaService.listarHistorico.mockRejectedValue(erro);
+    const request = { usuario: { id: "usuario-id" }, query: {} } as unknown as Request;
+    const nextMock = jest.fn();
+
+    await controller.listarHistorico(request, criarResponseMock().response, nextMock);
 
     expect(nextMock).toHaveBeenCalledWith(erro);
   });

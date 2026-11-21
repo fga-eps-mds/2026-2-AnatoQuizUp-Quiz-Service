@@ -258,6 +258,80 @@ describe("Testa Conquista Repository", () => {
     });
   });
 
+  test("Deve conceder o item de recompensa quando o tier tiver um associado", async () => {
+    const itemLoja = { id: "item-1", nome: "Item exclusivo" };
+    const tx = {
+      desbloqueioConquista: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: "desbloqueio-id" }),
+      },
+      carteiraMoedas: {
+        upsert: jest.fn(),
+        update: jest.fn(),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ saldo: 30 }),
+      },
+      transacaoMoeda: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      recompensaItemConquista: {
+        findUnique: jest.fn().mockResolvedValue({ itemLojaId: "item-1", itemLoja }),
+      },
+      inventarioItem: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    transactionMock.mockImplementation(async (callback) => callback(tx));
+
+    const resultado = await repository.criarDesbloqueioComRecompensas(
+      "usuario-id",
+      "conquista-id",
+      "BRONZE",
+      30,
+    );
+
+    expect(tx.inventarioItem.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ itemLojaId: "item-1", desbloqueioConquistaId: "desbloqueio-id" }),
+      }),
+    );
+    expect(resultado).toMatchObject({ itemConcedido: itemLoja });
+  });
+
+  test("Nao concede o item de recompensa quando o inventario ja possui (skipDuplicates)", async () => {
+    const tx = {
+      desbloqueioConquista: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: "desbloqueio-id" }),
+      },
+      carteiraMoedas: {
+        upsert: jest.fn(),
+        update: jest.fn(),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ saldo: 30 }),
+      },
+      transacaoMoeda: {
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      recompensaItemConquista: {
+        findUnique: jest.fn().mockResolvedValue({ itemLojaId: "item-1", itemLoja: { id: "item-1" } }),
+      },
+      inventarioItem: {
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    transactionMock.mockImplementation(async (callback) => callback(tx));
+
+    const resultado = await repository.criarDesbloqueioComRecompensas(
+      "usuario-id",
+      "conquista-id",
+      "BRONZE",
+      30,
+    );
+
+    // transacaoMoeda.createMany nao criou nada (ja existia): nao credita de novo.
+    expect(tx.carteiraMoedas.update).not.toHaveBeenCalled();
+    expect(resultado).toMatchObject({ moedasConcedidas: 0, itemConcedido: null });
+  });
+
   test("Nao duplica recompensas quando o tier ja foi desbloqueado", async () => {
     const tx = {
       desbloqueioConquista: {
@@ -350,6 +424,22 @@ describe("Testa Conquista Repository", () => {
 
         orderBy: {
           conquistadoEm: "desc",
+        },
+      }),
+    );
+  });
+
+  test("Deve listar destaques de varios usuarios de uma vez", async () => {
+    const usuarioIds = ["usuario-1", "usuario-2"];
+
+    await repository.listarDestaquesUsuarios(usuarioIds);
+
+    expect(prisma.desbloqueioConquista.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          usuarioId: { in: usuarioIds },
+          destaque: true,
+          conquista: { ativo: true },
         },
       }),
     );
