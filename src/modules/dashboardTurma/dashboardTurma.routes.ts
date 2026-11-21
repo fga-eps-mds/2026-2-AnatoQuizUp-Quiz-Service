@@ -5,7 +5,13 @@ import { validarRequisicao } from '@/shared/middlewares/validacao.middleware';
 import { TurmaDashboardRepository } from './dashboardTurma.repository';
 import { TurmaDashboardService } from './dashboardTurma.service';
 import { TurmaDashboardController } from './dashboardTurma.controller';
-import { schemaParamsDashboard, schemaParamsHistoricoAluno, schemaParamsListaDashboard } from './dashboardTruma.schemas';
+import {
+  schemaParamsDashboard,
+  schemaParamsHistoricoAluno,
+  schemaParamsEvolucaoTemas,
+  schemaParamsListaDashboard,
+  schemaQueryEvolucaoTemas,
+} from './dashboardTruma.schemas';
 
 const dashboardRouter = Router();
 
@@ -62,6 +68,14 @@ dashboardRouter.get(
   apenasGestao,
   validarRequisicao(schemaParamsListaDashboard, 'params'),
   turmaDashboardController.getTopErros
+);
+
+dashboardRouter.get(
+  '/:id/alunos/:alunoId/evolucao-temas',
+  middlewarePapeis(PAPEIS.PROFESSOR),
+  validarRequisicao(schemaParamsEvolucaoTemas, 'params'),
+  validarRequisicao(schemaQueryEvolucaoTemas, 'query'),
+  turmaDashboardController.listarEvolucaoTemas,
 );
 
 export { dashboardRouter };
