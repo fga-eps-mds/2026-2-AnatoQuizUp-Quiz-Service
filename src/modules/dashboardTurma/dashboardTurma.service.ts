@@ -2,7 +2,23 @@ import { PAPEIS } from '@/shared/constants/papeis';
 import { CodigoDeErro } from '@/shared/errors/codigos-de-erro';
 import { ErroAplicacao } from '@/shared/errors/erro-aplicacao';
 import type { TurmaDashboardRepository } from './dashboardTurma.repository';
-import type { DesempenhoListaDTO, TopErrosResponseDTO } from './dto/dashboardTurma.types';
+import type {
+  DesempenhoListaDTO,
+  EvolucaoTemaDTO,
+  EvolucaoTemasAlunoResponseDTO,
+  ResultadoTemaListaDTO,
+  StatusResultadoTemaDTO,
+  TopErrosResponseDTO,
+} from './dto/dashboardTurma.types';
+import { ErroAplicacao } from '@/shared/errors/erro-aplicacao';
+
+const mensagemComparacao = (totalResultadosValidos: number): string | null => {
+  if (totalResultadosValidos === 0) return 'Nenhuma entrega concluída para comparação.';
+  if (totalResultadosValidos === 1) {
+    return 'Uma entrega disponível. São necessárias duas para comparar.';
+  }
+  return null;
+};
 
 /**
  * Service do dashboard da turma (visao do professor).
@@ -385,4 +401,119 @@ export class TurmaDashboardService {
     };
   }
 
+  /**
+   * Compara o desempenho do aluno por tema entre as listas publicadas da turma.
+   * Pendencias aparecem no historico, mas nao interrompem nem alteram a variacao.
+   */
+  async getEvolucaoTemasAluno(
+    turmaId: string,
+    alunoId: string,
+    professorId: string,
+    inicio?: Date,
+    fim?: Date,
+  ): Promise<EvolucaoTemasAlunoResponseDTO> {
+    const temAcesso = await this.repository.professorTemAcessoAoAluno(
+      turmaId,
+      alunoId,
+      professorId,
+    );
+
+    if (!temAcesso) {
+      throw new ErroAplicacao({
+        codigoStatus: 404,
+        codigo: 'NAO_ENCONTRADO',
+        mensagem: 'Turma ou aluno não encontrado ou sem acesso.',
+      });
+    }
+
+    const listas = await this.repository.findListasParaEvolucaoTemas(
+      turmaId,
+      alunoId,
+      professorId,
+      inicio,
+      fim,
+    );
+
+    const temas = new Map<
+      string,
+      {
+        nome: string;
+        resultados: ResultadoTemaListaDTO[];
+        ultimaTaxaValida: number | null;
+        totalResultadosValidos: number;
+      }
+    >();
+
+    for (const lista of listas) {
+      const resolucao = lista.resolucoes[0];
+      const respostas = new Map(
+        resolucao?.respostas.map((resposta) => [resposta.questaoId, resposta.respostaMarcada]) ?? [],
+      );
+      const itensPorTema = new Map<
+        string,
+        {
+          nome: string;
+          itens: typeof lista.listaQuestao.itens;
+        }
+      >();
+
+      for (const item of lista.listaQuestao.itens) {
+        const tema = item.questao.tema;
+        const agrupamento = itensPorTema.get(tema.id) ?? { nome: tema.nome, itens: [] };
+        agrupamento.itens.push(item);
+        itensPorTema.set(tema.id, agrupamento);
+      }
+
+      for (const [temaId, agrupamento] of itensPorTema) {
+        const evolucao = temas.get(temaId) ?? {
+          nome: agrupamento.nome,
+          resultados: [],
+          ultimaTaxaValida: null,
+          totalResultadosValidos: 0,
+        };
+        const totalQuestoes = agrupamento.itens.length;
+        const status: StatusResultadoTemaDTO = resolucao?.status ?? 'NAO_RESPONDEU';
+        const entregaValida = status === 'SUBMETIDA';
+
+        let acertos: number | null = null;
+        let taxaAcerto: number | null = null;
+        let variacaoPp: number | null = null;
+
+        if (entregaValida) {
+          acertos = agrupamento.itens.filter(
+            (item) => respostas.get(item.questao.id) === item.questao.respostaCorreta,
+          ).length;
+          taxaAcerto = totalQuestoes > 0 ? Math.round((acertos / totalQuestoes) * 100) : 0;
+          variacaoPp =
+            evolucao.ultimaTaxaValida === null ? null : taxaAcerto - evolucao.ultimaTaxaValida;
+          evolucao.ultimaTaxaValida = taxaAcerto;
+          evolucao.totalResultadosValidos += 1;
+        }
+
+        evolucao.resultados.push({
+          listaTurmaId: lista.id,
+          nomeLista: lista.listaQuestao.nome,
+          publicadaEm: lista.criadoEm.toISOString(),
+          status,
+          acertos,
+          totalQuestoes,
+          taxaAcerto,
+          variacaoPp,
+        });
+        temas.set(temaId, evolucao);
+      }
+    }
+
+    const resultado: EvolucaoTemaDTO[] = Array.from(temas.entries())
+      .map(([temaId, tema]) => ({
+        temaId,
+        nome: tema.nome,
+        totalResultadosValidos: tema.totalResultadosValidos,
+        mensagem: mensagemComparacao(tema.totalResultadosValidos),
+        resultados: tema.resultados,
+      }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+    return { alunoId, temas: resultado };
+  }
 }
