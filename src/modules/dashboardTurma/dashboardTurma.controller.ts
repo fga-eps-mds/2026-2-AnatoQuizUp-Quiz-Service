@@ -138,4 +138,33 @@ export class TurmaDashboardController {
       return res.status(500).json({ error: 'Erro ao buscar detalhe da entrega.' });
     }
   };
+
+  /** GET evolucao do aluno por tema entre as listas publicadas da turma. */
+  listarEvolucaoTemas = async (req: Request, res: Response) => {
+    try {
+      const professorId = req.usuario?.id;
+      if (!professorId) {
+        return res.status(401).json({ error: 'Usuário não autenticado ou sessão expirada.' });
+      }
+
+      const inicio = typeof req.query.inicio === 'string' ? new Date(req.query.inicio) : undefined;
+      const fim = typeof req.query.fim === 'string' ? new Date(req.query.fim) : undefined;
+      const data = await this.service.getEvolucaoTemasAluno(
+        req.params.id as string,
+        req.params.alunoId as string,
+        professorId,
+        inicio,
+        fim,
+      );
+
+      return res.status(200).json(data);
+    } catch (error) {
+      if (error instanceof ErroAplicacao) {
+        return res.status(error.codigoStatus).json({ error: error.message });
+      }
+
+      console.error('Erro no TurmaDashboardController [evolucao por tema]:', error);
+      return res.status(500).json({ error: 'Erro ao buscar evolução por tema.' });
+    }
+  };
 }

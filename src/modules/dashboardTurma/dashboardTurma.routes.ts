@@ -8,7 +8,9 @@ import { TurmaDashboardController } from './dashboardTurma.controller';
 import {
   schemaParamsDashboard,
   schemaParamsDetalheEntrega,
+  schemaParamsEvolucaoTemas,
   schemaParamsListaDashboard,
+  schemaQueryEvolucaoTemas,
 } from './dashboardTruma.schemas';
 
 const dashboardRouter = Router();
@@ -59,6 +61,14 @@ dashboardRouter.get(
   middlewarePapeis(PAPEIS.PROFESSOR),
   validarRequisicao(schemaParamsDetalheEntrega, 'params'),
   turmaDashboardController.detalharEntrega,
+);
+
+dashboardRouter.get(
+  '/:id/alunos/:alunoId/evolucao-temas',
+  middlewarePapeis(PAPEIS.PROFESSOR),
+  validarRequisicao(schemaParamsEvolucaoTemas, 'params'),
+  validarRequisicao(schemaQueryEvolucaoTemas, 'query'),
+  turmaDashboardController.listarEvolucaoTemas,
 );
 
 export { dashboardRouter };

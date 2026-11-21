@@ -4,6 +4,20 @@ const prisma = new PrismaClient();
 
 // Repository do dashboard da turma: consultas Prisma para o professor montar metricas.
 export class TurmaDashboardRepository {
+  /** Confirma se o professor pode consultar o aluno dentro da turma informada. */
+  async professorTemAcessoAoAluno(turmaId: string, alunoId: string, professorId: string) {
+    const turma = await prisma.turma.findFirst({
+      where: {
+        id: turmaId,
+        professorId,
+        alunos: { some: { alunoId } },
+      },
+      select: { id: true },
+    });
+
+    return turma !== null;
+  }
+
   /**
    * Retorna apenas os ids dos alunos matriculados na turma.
    *
@@ -152,6 +166,73 @@ export class TurmaDashboardRepository {
         resolucoes: {
           where: { alunoId, status: 'SUBMETIDA' },
           include: { respostas: true },
+        },
+      },
+    });
+  }
+
+  /**
+   * Busca as publicacoes da turma que podem compor a evolucao por tema de um aluno.
+   * O filtro da turma, do professor e da matricula e aplicado na propria consulta.
+   */
+  async findListasParaEvolucaoTemas(
+    turmaId: string,
+    alunoId: string,
+    professorId: string,
+    inicio?: Date,
+    fim?: Date,
+  ) {
+    return prisma.listaTurma.findMany({
+      where: {
+        turmaId,
+        turma: {
+          professorId,
+          alunos: { some: { alunoId } },
+        },
+        ...(inicio && fim
+          ? {
+              criadoEm: {
+                gte: inicio,
+                lte: fim,
+              },
+            }
+          : {}),
+      },
+      orderBy: { criadoEm: 'asc' },
+      include: {
+        listaQuestao: {
+          select: {
+            nome: true,
+            itens: {
+              orderBy: { ordem: 'asc' },
+              select: {
+                questao: {
+                  select: {
+                    id: true,
+                    respostaCorreta: true,
+                    tema: {
+                      select: {
+                        id: true,
+                        nome: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        resolucoes: {
+          where: { alunoId },
+          select: {
+            status: true,
+            respostas: {
+              select: {
+                questaoId: true,
+                respostaMarcada: true,
+              },
+            },
+          },
         },
       },
     });
