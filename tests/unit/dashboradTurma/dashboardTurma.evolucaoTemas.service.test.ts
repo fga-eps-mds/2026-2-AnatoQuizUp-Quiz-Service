@@ -203,6 +203,55 @@ describe('TurmaDashboardService - evolucao por tema', () => {
     ]);
   });
 
+  it('calcula queda e estabilidade em listas de tamanhos diferentes', async () => {
+    repoMock.professorTemAcessoAoAluno.mockResolvedValue(true);
+    const criarLista = (
+      id: string,
+      publicadaEm: string,
+      totalQuestoes: number,
+      totalAcertos: number,
+    ) => {
+      const itens = Array.from({ length: totalQuestoes }, (_, indice) => ({
+        questao: {
+          id: `${id}-q${indice + 1}`,
+          respostaCorreta: 'A' as const,
+          tema: { id: 'tema-1', nome: 'Osteologia' },
+        },
+      }));
+      const respostas = Array.from({ length: totalAcertos }, (_, indice) => ({
+        questaoId: `${id}-q${indice + 1}`,
+        respostaMarcada: 'A' as const,
+      }));
+
+      return {
+        id,
+        criadoEm: new Date(publicadaEm),
+        listaQuestao: { nome: id, itens },
+        resolucoes: [{ status: 'SUBMETIDA' as const, respostas }],
+      };
+    };
+
+    repoMock.findListasParaEvolucaoTemas.mockResolvedValue([
+      criarLista('lista-80', '2026-03-01T10:00:00.000Z', 5, 4),
+      criarLista('lista-40', '2026-03-08T10:00:00.000Z', 5, 2),
+      criarLista('lista-50-menor', '2026-03-15T10:00:00.000Z', 4, 2),
+      criarLista('lista-50-maior', '2026-03-22T10:00:00.000Z', 6, 3),
+    ] as unknown as Awaited<ReturnType<TurmaDashboardRepository['findListasParaEvolucaoTemas']>>);
+
+    const result = await service.getEvolucaoTemasAluno('turma-1', 'aluno-1', 'professor-1');
+
+    expect(result.temas[0].resultados.map((resultado) => ({
+      taxaAcerto: resultado.taxaAcerto,
+      variacaoPp: resultado.variacaoPp,
+      totalQuestoes: resultado.totalQuestoes,
+    }))).toEqual([
+      { taxaAcerto: 80, variacaoPp: null, totalQuestoes: 5 },
+      { taxaAcerto: 40, variacaoPp: -40, totalQuestoes: 5 },
+      { taxaAcerto: 50, variacaoPp: 10, totalQuestoes: 4 },
+      { taxaAcerto: 50, variacaoPp: 0, totalQuestoes: 6 },
+    ]);
+  });
+
   it('recusa professor sem vinculo com a turma e o aluno', async () => {
     repoMock.professorTemAcessoAoAluno.mockResolvedValue(false);
 
