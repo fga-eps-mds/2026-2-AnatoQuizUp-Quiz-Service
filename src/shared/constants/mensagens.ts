@@ -33,6 +33,15 @@ export const MENSAGENS = {
   uploadImagemIndisponivel:
     "O envio de imagens esta temporariamente indisponivel neste ambiente.",
 
+  // Mensagens do dominio de casos OSCE (US26).
+  casoOsceCriado: "Caso OSCE criado com sucesso.",
+
+  casoOsceEncontrado: "Caso OSCE encontrado com sucesso.",
+
+  casoOsceAtualizado: "Caso OSCE atualizado com sucesso.",
+
+  casoOsceNaoEncontrado: "Caso OSCE nao encontrado.",
+
   // Mensagens de usuario, cadastro e administracao.
   usuarioNaoEncontrado: "Usuario nao encontrado.",
 
