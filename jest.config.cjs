@@ -53,5 +53,7 @@ module.exports = {
   testMatch: ["<rootDir>/src/**/*.test.ts", "<rootDir>/tests/**/*.test.ts"],
   transform: {
     "^.+\\.ts$": "babel-jest",
+    "^.+\\.js$": "babel-jest",
   },
+  transformIgnorePatterns: ["node_modules/(?!(decode-uri-component)/)"],
 };
