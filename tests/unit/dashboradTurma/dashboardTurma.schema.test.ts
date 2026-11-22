@@ -1,4 +1,9 @@
-import { schemaParamsListaDashboard, schemaParamsDashboard } from '../../../src/modules/dashboardTurma/dashboardTruma.schemas';
+import {
+  schemaParamsDashboard,
+  schemaParamsDetalheEntrega,
+  schemaParamsEvolucaoTemas,
+  schemaParamsListaDashboard,
+} from '../../../src/modules/dashboardTurma/dashboardTruma.schemas';
 
 describe('schemaParamsDashboard', () => {
   it('deve validar um ID cuid valido', () => {
@@ -38,4 +43,41 @@ describe('schemaParamsListaDashboard', () => {
     const result = schemaParamsListaDashboard.safeParse({});
     expect(result.success).toBe(false);
   });
+});
+
+describe('schemas de consulta individual do aluno', () => {
+  const turmaId = 'cmpsx9a2f00064hx26j7kukdo';
+  const listaId = 'cmq101jjt002w4hitmlzi7d3g';
+
+  it('aceita identificador legado do aluno na evolução por tema', () => {
+    const result = schemaParamsEvolucaoTemas.safeParse({
+      id: turmaId,
+      alunoId: 'aluno-joao',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('aceita identificador legado do aluno no detalhe da entrega', () => {
+    const result = schemaParamsDetalheEntrega.safeParse({
+      id: turmaId,
+      listaId,
+      alunoId: 'aluno-joao',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it.each([schemaParamsEvolucaoTemas, schemaParamsDetalheEntrega])(
+    'rejeita identificador vazio do aluno',
+    (schema) => {
+      const result = schema.safeParse({
+        id: turmaId,
+        listaId,
+        alunoId: '   ',
+      });
+
+      expect(result.success).toBe(false);
+    },
+  );
 });
