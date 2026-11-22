@@ -17,6 +17,11 @@ const avatar = (seed: string, skinColor: string) =>
 
 const GRADIENTE_OURO = "linear-gradient(135deg, #FCD34D 0%, #D4AF37 100%)";
 
+// Itens de avatar (acessorio/luva/calcado) sao arte propria, servida pelo Web em
+// public/avatar/<categoria>/<codigo>.png — caminho relativo, resolvido no proprio
+// dominio do Web que exibe a loja (CosmeticPreview), sem depender de host externo.
+const imagemAvatarWeb = (categoria: string, codigo: string) => `/avatar/${categoria}/${codigo}.png`;
+
 const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
   {
     codigo: "icone-coruja",
@@ -222,6 +227,99 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     precoMoedas: 250,
     imagemUrl: avatar("CabeloMoicano3", "d08b5b"),
     previewImagemUrl: avatar("CabeloMoicano3", "d08b5b"),
+  },
+
+  // Acessorios (US36, #199 T1.4): 10 modelos novos, sem base existente pra herdar
+  // preco (todos sao design novo, nao recolor).
+  {
+    codigo: "bone",
+    nome: "Boné",
+    descricao: "Um boné casual pra qualquer ocasião.",
+    tipo: TipoItemLoja.ACESSORIO,
+    precoMoedas: 150,
+    imagemUrl: imagemAvatarWeb("acessorios", "acessorio-bone"),
+    previewImagemUrl: imagemAvatarWeb("acessorios", "acessorio-bone"),
+  },
+  {
+    codigo: "tiara",
+    nome: "Tiara",
+    descricao: "Uma tiara elegante, puro brilho.",
+    tipo: TipoItemLoja.ACESSORIO,
+    precoMoedas: 220,
+    imagemUrl: imagemAvatarWeb("acessorios", "acessorio-tiara"),
+    previewImagemUrl: imagemAvatarWeb("acessorios", "acessorio-tiara"),
+  },
+  {
+    codigo: "oculos-sol",
+    nome: "Óculos de Sol",
+    descricao: "Estilo e proteção contra o sol.",
+    tipo: TipoItemLoja.ACESSORIO,
+    precoMoedas: 150,
+    imagemUrl: imagemAvatarWeb("acessorios", "acessorio-oculos-sol"),
+    previewImagemUrl: imagemAvatarWeb("acessorios", "acessorio-oculos-sol"),
+  },
+  {
+    codigo: "chapeu-festa",
+    nome: "Chapéu de Festa",
+    descricao: "Pra comemorar com estilo.",
+    tipo: TipoItemLoja.ACESSORIO,
+    precoMoedas: 150,
+    imagemUrl: imagemAvatarWeb("acessorios", "acessorio-chapeu-festa"),
+    previewImagemUrl: imagemAvatarWeb("acessorios", "acessorio-chapeu-festa"),
+  },
+  {
+    codigo: "capacete",
+    nome: "Capacete",
+    descricao: "Segurança em primeiro lugar.",
+    tipo: TipoItemLoja.ACESSORIO,
+    precoMoedas: 220,
+    imagemUrl: imagemAvatarWeb("acessorios", "acessorio-capacete"),
+    previewImagemUrl: imagemAvatarWeb("acessorios", "acessorio-capacete"),
+  },
+  {
+    codigo: "chapeu-mago",
+    nome: "Chapéu de Mago",
+    descricao: "Pra quem domina a magia dos estudos.",
+    tipo: TipoItemLoja.ACESSORIO,
+    precoMoedas: 220,
+    imagemUrl: imagemAvatarWeb("acessorios", "acessorio-chapeu-mago"),
+    previewImagemUrl: imagemAvatarWeb("acessorios", "acessorio-chapeu-mago"),
+  },
+  {
+    codigo: "chapeu-chef",
+    nome: "Chapéu de Chef",
+    descricao: "Pra quem cozinha as melhores respostas.",
+    tipo: TipoItemLoja.ACESSORIO,
+    precoMoedas: 150,
+    imagemUrl: imagemAvatarWeb("acessorios", "acessorio-chapeu-chef"),
+    previewImagemUrl: imagemAvatarWeb("acessorios", "acessorio-chapeu-chef"),
+  },
+  {
+    codigo: "chapeu-palha",
+    nome: "Chapéu de Palha",
+    descricao: "Aba larga, estilo de verão.",
+    tipo: TipoItemLoja.ACESSORIO,
+    precoMoedas: 150,
+    imagemUrl: imagemAvatarWeb("acessorios", "acessorio-chapeu-palha"),
+    previewImagemUrl: imagemAvatarWeb("acessorios", "acessorio-chapeu-palha"),
+  },
+  {
+    codigo: "mascara-carnaval",
+    nome: "Máscara de Carnaval",
+    descricao: "Penas coloridas pra brincar o ano inteiro.",
+    tipo: TipoItemLoja.ACESSORIO,
+    precoMoedas: 220,
+    imagemUrl: imagemAvatarWeb("acessorios", "acessorio-mascara-carnaval"),
+    previewImagemUrl: imagemAvatarWeb("acessorios", "acessorio-mascara-carnaval"),
+  },
+  {
+    codigo: "chapeu-cowboy",
+    nome: "Chapéu de Cowboy",
+    descricao: "Pra quem estuda no estilo caubói.",
+    tipo: TipoItemLoja.ACESSORIO,
+    precoMoedas: 150,
+    imagemUrl: imagemAvatarWeb("acessorios", "acessorio-chapeu-cowboy"),
+    previewImagemUrl: imagemAvatarWeb("acessorios", "acessorio-chapeu-cowboy"),
   },
 
   // Itens consumiveis (issue #35): podem ser comprados varias vezes e acumulam
