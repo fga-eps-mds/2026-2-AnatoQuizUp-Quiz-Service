@@ -224,6 +224,80 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     previewImagemUrl: avatar("CabeloMoicano3", "d08b5b"),
   },
 
+  // Calcados (US36, #199 T1.10): o "codigo" e resolvido pelo proprio Web numa tabela
+  // local de assets do avatar (igual acessorio/luva/cabelo) — por isso sem imagemUrl,
+  // igual MOLDURA/TITULO. Recolor de um tenis existente mantem o preco do modelo-base.
+  {
+    codigo: "tenis-esportivo-vermelho",
+    nome: "Esportivo Vermelho",
+    descricao: "O tênis esportivo clássico, agora em vermelho.",
+    tipo: TipoItemLoja.CALCADO,
+    precoMoedas: 120,
+  },
+  {
+    codigo: "tenis-esportivo-verde",
+    nome: "Esportivo Verde",
+    descricao: "O tênis esportivo clássico, agora em verde.",
+    tipo: TipoItemLoja.CALCADO,
+    precoMoedas: 120,
+  },
+  {
+    codigo: "tenis-esportivo-amarelo",
+    nome: "Esportivo Amarelo",
+    descricao: "O tênis esportivo clássico, agora em amarelo.",
+    tipo: TipoItemLoja.CALCADO,
+    precoMoedas: 120,
+  },
+  {
+    codigo: "tenis-esportivo-preto",
+    nome: "Esportivo Preto",
+    descricao: "O tênis esportivo clássico, agora em preto.",
+    tipo: TipoItemLoja.CALCADO,
+    precoMoedas: 120,
+  },
+  {
+    codigo: "tenis-cano-alto-azul",
+    nome: "Cano Alto Azul",
+    descricao: "O tênis cano alto clássico, agora em azul.",
+    tipo: TipoItemLoja.CALCADO,
+    precoMoedas: 120,
+  },
+  {
+    codigo: "tenis-cano-alto-verde",
+    nome: "Cano Alto Verde",
+    descricao: "O tênis cano alto clássico, agora em verde.",
+    tipo: TipoItemLoja.CALCADO,
+    precoMoedas: 120,
+  },
+  {
+    codigo: "tenis-cano-alto-amarelo",
+    nome: "Cano Alto Amarelo",
+    descricao: "O tênis cano alto clássico, agora em amarelo.",
+    tipo: TipoItemLoja.CALCADO,
+    precoMoedas: 120,
+  },
+  {
+    codigo: "tenis-cano-alto-preto",
+    nome: "Cano Alto Preto",
+    descricao: "O tênis cano alto clássico, agora em preto.",
+    tipo: TipoItemLoja.CALCADO,
+    precoMoedas: 120,
+  },
+  {
+    codigo: "tenis-skate",
+    nome: "Skate",
+    descricao: "Cano baixo, sola grossa, estilo skatista.",
+    tipo: TipoItemLoja.CALCADO,
+    precoMoedas: 150,
+  },
+  {
+    codigo: "bota-coturno",
+    nome: "Coturno",
+    descricao: "Cano alto, cadarço cruzado, sola grossa.",
+    tipo: TipoItemLoja.CALCADO,
+    precoMoedas: 220,
+  },
+
   // Itens consumiveis (issue #35): podem ser comprados varias vezes e acumulam
   // quantidade no inventario. O "codigo" identifica o efeito que a #38 aplica.
   {

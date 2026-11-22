@@ -114,6 +114,7 @@ enum TipoItemLoja {
   CABELO
   DICA
   POTENCIALIZADOR
+  CALCADO
 }
 
 enum OrigemItemInventario {
