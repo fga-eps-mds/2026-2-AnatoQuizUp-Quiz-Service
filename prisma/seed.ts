@@ -2,7 +2,6 @@ import {
   AlternativaQuestao,
   Dificuldade,
   PrismaClient,
-  StatusCasoOsce,
   StatusQuestao,
   StatusTurma,
   TierConquista,
@@ -35,8 +34,8 @@ async function main() {
   await prisma.questao.deleteMany({});
   await prisma.tema.deleteMany({});
   await prisma.turma.deleteMany({});
-  await prisma.exameCasoOsce.deleteMany({});
-  await prisma.casoOsce.deleteMany({});
+  // casoOsce/exameCasoOsce NAO entram aqui: o unico caso validado com o PO vem de
+  // migration (20261122160000_seed_caso_osce_alcool), nao do seed, e nao pode ser apagado.
 
   const PROFESSOR_ID = "cmp7fx97j00034hyqazqwrk3e";
   const ALUNO_1_ID = "cmp7fx99d00044hyqq4msqsyt";
@@ -736,110 +735,8 @@ async function main() {
 
   }
 
-  // 8. Casos OSCE (US26): os 2 casos reais, ja publicados.
-  console.log("Casos OSCE publicados criados com sucesso.");
-
-  await prisma.casoOsce.create({
-    data: {
-      titulo: "Dor torácica no pronto-socorro",
-      especialidade: "Cardiologia",
-      dificuldade: Dificuldade.MEDIA,
-      diagnosticoEsperado: "Infarto agudo do miocárdio",
-      local: "Pronto-socorro de um hospital geral",
-      papelEstudante: "Médico(a) responsável pelo primeiro atendimento",
-      idadePaciente: 58,
-      sexoPaciente: "Masculino",
-      queixaPaciente: "Dor no peito",
-      perfilPaciente:
-        "Homem de 58 anos, motorista de caminhão, fala de forma direta e um pouco ansiosa.",
-      historiaSintomas:
-        "Dor torácica em aperto há 2 horas, irradiando para o braço esquerdo, associada a sudorese fria e náusea. Hipertenso, tabagista, pai teve infarto aos 55 anos.",
-      exameFisico:
-        "PA 160x100 mmHg, FC 98 bpm, sudoreico, ausculta cardíaca e pulmonar sem alterações.",
-      status: StatusCasoOsce.PUBLICADO,
-      criadoPorId: PROFESSOR_ID,
-      exames: {
-        create: [
-          { nome: "Eletrocardiograma", resultado: "Supradesnivelamento de ST em parede inferior." },
-          { nome: "Troponina", resultado: "Elevada (0,8 ng/mL)." },
-        ],
-      },
-    },
-  });
-
-  await prisma.casoOsce.create({
-    data: {
-      titulo: "Dor abdominal em fossa ilíaca direita",
-      especialidade: "Gastroenterologia / Cirurgia",
-      dificuldade: Dificuldade.FACIL,
-      diagnosticoEsperado: "Apendicite aguda",
-      local: "Unidade de Pronto Atendimento (UPA)",
-      papelEstudante: "Médico(a) responsável pelo primeiro atendimento",
-      idadePaciente: 16,
-      sexoPaciente: "Masculino",
-      queixaPaciente: "Dor na barriga",
-      perfilPaciente: "Adolescente de 16 anos, estudante, um pouco tímido ao relatar os sintomas.",
-      historiaSintomas:
-        "Dor periumbilical há 18 horas, que migrou para a fossa ilíaca direita, com piora progressiva, anorexia e um episódio de vômito. Sem febre até o momento.",
-      exameFisico:
-        "Temperatura 37,8°C, dor à palpação em fossa ilíaca direita com sinal de Blumberg positivo.",
-      status: StatusCasoOsce.PUBLICADO,
-      criadoPorId: PROFESSOR_ID,
-      exames: {
-        create: [
-          { nome: "Hemograma", resultado: "Leucocitose com desvio à esquerda (14.000/mm³)." },
-          { nome: "Ultrassonografia abdominal", resultado: "Apêndice espessado (9mm), com líquido livre periapendicular." },
-        ],
-      },
-    },
-  });
-
-  // Caso real baseado na simulação realística "Álcool: dependência e abstinência"
-  // (SFC 5, UnB) - atendimento de demanda espontânea numa UBS.
-  await prisma.casoOsce.create({
-    data: {
-      titulo: "Tremedeira e enjoo quando fico sem beber",
-      especialidade: "Medicina de Família e Comunidade",
-      dificuldade: Dificuldade.MEDIA,
-      diagnosticoEsperado: "Dependência de álcool (CID-10: F10.2) com síndrome de abstinência leve",
-      local: "Unidade Básica de Saúde (UBS) - consulta de demanda espontânea",
-      papelEstudante: "Médico(a) de Família e Comunidade, atendendo a primeira consulta",
-      idadePaciente: 48,
-      sexoPaciente: "Masculino",
-      queixaPaciente: "Tremedeira e enjoo quando fico sem beber",
-      perfilPaciente:
-        "José Carlos da Silva, 48 anos, motorista de caminhão, casado, acompanhado pela esposa Marta Fagundes Rocha (46 anos, diarista). Fala de forma ansiosa, com leve sudorese e mãos trêmulas; se o médico for acolhedor, demonstra confiança e alívio, caso contrário fica defensivo. Teme perder o emprego e está envergonhado de procurar ajuda.",
-      historiaSintomas:
-        "Bebe cerca de 5 latas de cerveja por dia há mais de 12 anos, consumo que se intensificou nos últimos meses. Ao tentar reduzir ou parar, surgem tremores nas mãos, sudorese, enjoo e ansiedade, aliviados imediatamente com nova dose de álcool (inclusive pela manhã). Consegue ficar sem beber só 6 a 8 horas antes dos sintomas começarem. Fica agressivo quando a esposa tenta falar sobre o assunto e já perdeu dias de trabalho. Pai faleceu de cirrose alcoólica; nega doenças crônicas, alergias ou uso de medicações contínuas; cirurgia prévia há 15 anos (acidente de caminhão). Relata culpa e vergonha pela situação.",
-      exameFisico:
-        "Ansioso, com leve sudorese e tremores finos e visíveis em extremidades superiores; leves telangiectasias em região malar; orientado no tempo e espaço. PA 145x95 mmHg, FC 95 bpm. Pele e mucosas normocoradas e anictéricas, sem aranhas vasculares. Aparelho cardiovascular com bulhas rítmicas e normofonéticas em 2 tempos. Aparelho respiratório com murmúrio vesicular audível e simétrico. Abdome globoso, indolor à palpação, ruídos hidroaéreos presentes, sem visceromegalias. Neurológico com tremores de repouso e ação.",
-      status: StatusCasoOsce.PUBLICADO,
-      criadoPorId: PROFESSOR_ID,
-      exames: {
-        create: [
-          {
-            nome: "Hemograma completo",
-            resultado: "VCM elevado (macrocitose), achado comum no abuso crônico de álcool.",
-          },
-          {
-            nome: "Função hepática (AST/TGO, ALT/TGP, GGT, bilirrubinas, albumina)",
-            resultado:
-              "GGT elevada (150 U/L, referência até 60 U/L), indicando lesão hepática alcoólica; demais transaminases e bilirrubinas sem alterações significativas.",
-          },
-          {
-            nome: "Glicemia, ureia e creatinina",
-            resultado: "Dentro da normalidade.",
-          },
-          {
-            nome: "Questionário AUDIT",
-            resultado:
-              "17 pontos - Zona de Risco Moderado-Grave (Zona III), indicando consumo prejudicial e necessidade de tratamento formal.",
-          },
-        ],
-      },
-    },
-  });
-
+  // 8. Casos OSCE (US26): o unico caso validado com o PO vem da migration
+  // 20261122160000_seed_caso_osce_alcool, nao mais daqui (evita duplicar).
 }
 
 main()
