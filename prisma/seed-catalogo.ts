@@ -17,6 +17,11 @@ const avatar = (seed: string, skinColor: string) =>
 
 const GRADIENTE_OURO = "linear-gradient(135deg, #FCD34D 0%, #D4AF37 100%)";
 
+// Itens de avatar (acessorio/luva/calcado) sao arte propria, servida pelo Web em
+// public/avatar/<categoria>/<codigo>.png — caminho relativo, resolvido no proprio
+// dominio do Web que exibe a loja (CosmeticPreview), sem depender de host externo.
+const imagemAvatarWeb = (categoria: string, codigo: string) => `/avatar/${categoria}/${codigo}.png`;
+
 const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
   {
     codigo: "icone-coruja",
@@ -222,6 +227,99 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     precoMoedas: 250,
     imagemUrl: avatar("CabeloMoicano3", "d08b5b"),
     previewImagemUrl: avatar("CabeloMoicano3", "d08b5b"),
+  },
+
+  // Luvas (US36, #199 T1.7). Recolor de uma luva existente mantem o preco do
+  // modelo-base; a imagem e a mesma arte usada no overlay do avatar (ver Web).
+  {
+    codigo: "luva-boxe-azul",
+    nome: "Boxe Azul",
+    descricao: "A luva de boxe clássica, agora em azul.",
+    tipo: TipoItemLoja.LUVA,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("luvas", "luva-boxe-azul"),
+    previewImagemUrl: imagemAvatarWeb("luvas", "luva-boxe-azul"),
+  },
+  {
+    codigo: "luva-boxe-verde",
+    nome: "Boxe Verde",
+    descricao: "A luva de boxe clássica, agora em verde.",
+    tipo: TipoItemLoja.LUVA,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("luvas", "luva-boxe-verde"),
+    previewImagemUrl: imagemAvatarWeb("luvas", "luva-boxe-verde"),
+  },
+  {
+    codigo: "luva-boxe-dourado",
+    nome: "Boxe Dourada",
+    descricao: "A luva de boxe clássica, agora em dourado.",
+    tipo: TipoItemLoja.LUVA,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("luvas", "luva-boxe-dourado"),
+    previewImagemUrl: imagemAvatarWeb("luvas", "luva-boxe-dourado"),
+  },
+  {
+    codigo: "luva-boxe-roxo",
+    nome: "Boxe Roxa",
+    descricao: "A luva de boxe clássica, agora em roxo.",
+    tipo: TipoItemLoja.LUVA,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("luvas", "luva-boxe-roxo"),
+    previewImagemUrl: imagemAvatarWeb("luvas", "luva-boxe-roxo"),
+  },
+  {
+    codigo: "luva-boxe-preta",
+    nome: "Boxe Preta",
+    descricao: "A luva de boxe clássica, agora em preto.",
+    tipo: TipoItemLoja.LUVA,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("luvas", "luva-boxe-preta"),
+    previewImagemUrl: imagemAvatarWeb("luvas", "luva-boxe-preta"),
+  },
+  {
+    codigo: "luva-la-rosa",
+    nome: "Lã Rosa",
+    descricao: "A luva de lã clássica, em nova paleta rosa com punho branco.",
+    tipo: TipoItemLoja.LUVA,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("luvas", "luva-la-rosa"),
+    previewImagemUrl: imagemAvatarWeb("luvas", "luva-la-rosa"),
+  },
+  {
+    codigo: "luva-la-verde",
+    nome: "Lã Verde",
+    descricao: "A luva de lã clássica, em nova paleta verde com punho branco.",
+    tipo: TipoItemLoja.LUVA,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("luvas", "luva-la-verde"),
+    previewImagemUrl: imagemAvatarWeb("luvas", "luva-la-verde"),
+  },
+  {
+    codigo: "luva-la-azul",
+    nome: "Lã Azul",
+    descricao: "A luva de lã clássica, em nova paleta azul com punho prateado.",
+    tipo: TipoItemLoja.LUVA,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("luvas", "luva-la-azul"),
+    previewImagemUrl: imagemAvatarWeb("luvas", "luva-la-azul"),
+  },
+  {
+    codigo: "luva-jardinagem",
+    nome: "Jardinagem",
+    descricao: "Luva de pano simples, com punho elástico.",
+    tipo: TipoItemLoja.LUVA,
+    precoMoedas: 150,
+    imagemUrl: imagemAvatarWeb("luvas", "luva-jardinagem"),
+    previewImagemUrl: imagemAvatarWeb("luvas", "luva-jardinagem"),
+  },
+  {
+    codigo: "luva-goleiro",
+    nome: "Goleiro",
+    descricao: "Luva com grip emborrachado nos dedos, mais robusta.",
+    tipo: TipoItemLoja.LUVA,
+    precoMoedas: 220,
+    imagemUrl: imagemAvatarWeb("luvas", "luva-goleiro"),
+    previewImagemUrl: imagemAvatarWeb("luvas", "luva-goleiro"),
   },
 
   // Itens consumiveis (issue #35): podem ser comprados varias vezes e acumulam
