@@ -72,6 +72,25 @@ export class CasoOsceService {
     return converterParaRespostaCasoOsce(caso);
   }
 
+  // Exclui (soft delete) um caso; 404 se nao existir/ja excluido, 403 se nao for o dono.
+  async excluir(id: string, professorId: string): Promise<void> {
+    const caso = await this.casoOsceRepository.buscarPorId(id);
+
+    if (!caso) {
+      throw this.erroCasoNaoEncontrado(id);
+    }
+
+    if (caso.criadoPorId !== professorId) {
+      throw new ErroAplicacao({
+        codigoStatus: 403,
+        codigo: CodigoDeErro.PROIBIDO,
+        mensagem: MENSAGENS.casoOsceSemPermissaoExclusao,
+      });
+    }
+
+    await this.casoOsceRepository.excluir(id);
+  }
+
   private erroCasoNaoEncontrado(id: string) {
     return new ErroAplicacao({
       codigoStatus: 404,

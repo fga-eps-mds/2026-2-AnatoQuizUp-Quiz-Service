@@ -88,4 +88,16 @@ export class CasoOsceRepository {
       include: includeExames,
     }) as Promise<RegistroCasoOsceCompleto>;
   }
+
+  /**
+   * Soft delete do caso: marca excluidoEm. Nao apaga tentativas associadas (US27/US46).
+   *
+   * @param id Id do caso.
+   */
+  async excluir(id: string): Promise<void> {
+    await prisma.casoOsce.update({
+      where: { id },
+      data: { excluidoEm: new Date() },
+    });
+  }
 }

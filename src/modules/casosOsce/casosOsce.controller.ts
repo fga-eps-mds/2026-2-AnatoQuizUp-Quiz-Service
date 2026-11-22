@@ -54,4 +54,14 @@ export class CasoOsceController {
       return next(error);
     }
   };
+
+  excluir = async (request: Request<{ id: string }>, response: Response, next: NextFunction) => {
+    try {
+      const professorId = request.usuario?.id ?? "";
+      await this.casoOsceService.excluir(request.params.id, professorId);
+      return response.status(204).send();
+    } catch (error) {
+      return next(error);
+    }
+  };
 }

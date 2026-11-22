@@ -171,4 +171,66 @@ describe("Testes de Integração - Casos OSCE", () => {
       expect(body.dados.exames).toEqual([{ nome: "Exame novo", resultado: "Y" }]);
     });
   });
+
+  describe("DELETE /api/v1/casos-osce/:id", () => {
+    it("responde 404 para id inexistente", async () => {
+      const response = await request(app).delete("/api/v1/casos-osce/id-que-nao-existe");
+
+      expect(response.status).toBe(404);
+    });
+
+    it("responde 403 quando o caso pertence a outro professor", async () => {
+      const caso = await prisma.casoOsce.create({
+        data: { titulo: "Caso de outro professor", criadoPorId: "outro-professor-id" },
+      });
+
+      const response = await request(app).delete(`/api/v1/casos-osce/${caso.id}`);
+
+      expect(response.status).toBe(403);
+    });
+
+    it("exclui (soft delete) um caso do proprio professor, retornando 204", async () => {
+      const caso = await prisma.casoOsce.create({
+        data: { titulo: "Caso a excluir", criadoPorId: "prof-osce-123" },
+      });
+
+      const response = await request(app).delete(`/api/v1/casos-osce/${caso.id}`);
+
+      expect(response.status).toBe(204);
+      expect(response.body).toEqual({});
+
+      const registro = await prisma.casoOsce.findUnique({ where: { id: caso.id } });
+      expect(registro?.excluidoEm).not.toBeNull();
+    });
+
+    it("some de listar, detalhar e atualizar apos a exclusao", async () => {
+      const caso = await prisma.casoOsce.create({
+        data: { titulo: "Caso a excluir", criadoPorId: "prof-osce-123" },
+      });
+
+      await request(app).delete(`/api/v1/casos-osce/${caso.id}`);
+
+      const listagem = await request(app).get("/api/v1/casos-osce");
+      expect((listagem.body as RespostaPaginada<RespostaCasoOsceDto>).dados).toHaveLength(0);
+
+      const detalhe = await request(app).get(`/api/v1/casos-osce/${caso.id}`);
+      expect(detalhe.status).toBe(404);
+
+      const atualizacao = await request(app)
+        .patch(`/api/v1/casos-osce/${caso.id}`)
+        .send({ titulo: "X" });
+      expect(atualizacao.status).toBe(404);
+    });
+
+    it("responde 404 ao tentar excluir um caso ja excluido", async () => {
+      const caso = await prisma.casoOsce.create({
+        data: { titulo: "Caso a excluir duas vezes", criadoPorId: "prof-osce-123" },
+      });
+
+      await request(app).delete(`/api/v1/casos-osce/${caso.id}`);
+      const segundaExclusao = await request(app).delete(`/api/v1/casos-osce/${caso.id}`);
+
+      expect(segundaExclusao.status).toBe(404);
+    });
+  });
 });

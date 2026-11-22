@@ -43,4 +43,10 @@ casoOsceRouter.patch(
   casoOsceController.atualizar,
 );
 
+casoOsceRouter.delete(
+  "/:id",
+  validarRequisicao(schemaBuscarCasoOscePorId, "params"),
+  casoOsceController.excluir,
+);
+
 export { casoOsceRouter };

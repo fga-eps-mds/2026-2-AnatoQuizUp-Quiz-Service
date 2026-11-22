@@ -42,6 +42,8 @@ export const MENSAGENS = {
 
   casoOsceNaoEncontrado: "Caso OSCE nao encontrado.",
 
+  casoOsceSemPermissaoExclusao: "Voce nao tem permissao para excluir este caso OSCE.",
+
   // Mensagens de usuario, cadastro e administracao.
   usuarioNaoEncontrado: "Usuario nao encontrado.",
 
