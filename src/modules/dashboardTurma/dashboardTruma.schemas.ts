@@ -29,16 +29,16 @@ export const schemaParamsListaDashboard = z.object({
 export const schemaParamsDetalheEntrega = schemaParamsListaDashboard.extend({
   alunoId: z.string({
     message: 'O ID do aluno é obrigatório.',
-  }).cuid({
-    message: 'Formato de ID do aluno inválido.',
+  }).trim().min(1, {
+    message: 'O ID do aluno é obrigatório.',
   }),
 });
 
 export const schemaParamsEvolucaoTemas = schemaParamsDashboard.extend({
   alunoId: z.string({
     message: 'O ID do aluno é obrigatório.',
-  }).cuid({
-    message: 'Formato de ID do aluno inválido.',
+  }).trim().min(1, {
+    message: 'O ID do aluno é obrigatório.',
   }),
 });
 
