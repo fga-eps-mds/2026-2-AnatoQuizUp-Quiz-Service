@@ -17,6 +17,11 @@ const avatar = (seed: string, skinColor: string) =>
 
 const GRADIENTE_OURO = "linear-gradient(135deg, #FCD34D 0%, #D4AF37 100%)";
 
+// Itens de avatar (acessorio/luva/calcado) sao arte propria, servida pelo Web em
+// public/avatar/<categoria>/<codigo>.png — caminho relativo, resolvido no proprio
+// dominio do Web que exibe a loja (CosmeticPreview), sem depender de host externo.
+const imagemAvatarWeb = (categoria: string, codigo: string) => `/avatar/${categoria}/${codigo}.png`;
+
 const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
   {
     codigo: "icone-coruja",
@@ -224,15 +229,16 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     previewImagemUrl: avatar("CabeloMoicano3", "d08b5b"),
   },
 
-  // Calcados (US36, #199 T1.10): o "codigo" e resolvido pelo proprio Web numa tabela
-  // local de assets do avatar (igual acessorio/luva/cabelo) — por isso sem imagemUrl,
-  // igual MOLDURA/TITULO. Recolor de um tenis existente mantem o preco do modelo-base.
+  // Calcados (US36, #199 T1.10). Recolor de um tenis existente mantem o preco do
+  // modelo-base; a imagem e a mesma arte usada no overlay do avatar (ver Web).
   {
     codigo: "tenis-esportivo-vermelho",
     nome: "Esportivo Vermelho",
     descricao: "O tênis esportivo clássico, agora em vermelho.",
     tipo: TipoItemLoja.CALCADO,
     precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("calcados", "tenis-esportivo-vermelho"),
+    previewImagemUrl: imagemAvatarWeb("calcados", "tenis-esportivo-vermelho"),
   },
   {
     codigo: "tenis-esportivo-verde",
@@ -240,6 +246,8 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     descricao: "O tênis esportivo clássico, agora em verde.",
     tipo: TipoItemLoja.CALCADO,
     precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("calcados", "tenis-esportivo-verde"),
+    previewImagemUrl: imagemAvatarWeb("calcados", "tenis-esportivo-verde"),
   },
   {
     codigo: "tenis-esportivo-amarelo",
@@ -247,6 +255,8 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     descricao: "O tênis esportivo clássico, agora em amarelo.",
     tipo: TipoItemLoja.CALCADO,
     precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("calcados", "tenis-esportivo-amarelo"),
+    previewImagemUrl: imagemAvatarWeb("calcados", "tenis-esportivo-amarelo"),
   },
   {
     codigo: "tenis-esportivo-preto",
@@ -254,6 +264,8 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     descricao: "O tênis esportivo clássico, agora em preto.",
     tipo: TipoItemLoja.CALCADO,
     precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("calcados", "tenis-esportivo-preto"),
+    previewImagemUrl: imagemAvatarWeb("calcados", "tenis-esportivo-preto"),
   },
   {
     codigo: "tenis-cano-alto-azul",
@@ -261,6 +273,8 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     descricao: "O tênis cano alto clássico, agora em azul.",
     tipo: TipoItemLoja.CALCADO,
     precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("calcados", "tenis-cano-alto-azul"),
+    previewImagemUrl: imagemAvatarWeb("calcados", "tenis-cano-alto-azul"),
   },
   {
     codigo: "tenis-cano-alto-verde",
@@ -268,6 +282,8 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     descricao: "O tênis cano alto clássico, agora em verde.",
     tipo: TipoItemLoja.CALCADO,
     precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("calcados", "tenis-cano-alto-verde"),
+    previewImagemUrl: imagemAvatarWeb("calcados", "tenis-cano-alto-verde"),
   },
   {
     codigo: "tenis-cano-alto-amarelo",
@@ -275,6 +291,8 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     descricao: "O tênis cano alto clássico, agora em amarelo.",
     tipo: TipoItemLoja.CALCADO,
     precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("calcados", "tenis-cano-alto-amarelo"),
+    previewImagemUrl: imagemAvatarWeb("calcados", "tenis-cano-alto-amarelo"),
   },
   {
     codigo: "tenis-cano-alto-preto",
@@ -282,6 +300,8 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     descricao: "O tênis cano alto clássico, agora em preto.",
     tipo: TipoItemLoja.CALCADO,
     precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("calcados", "tenis-cano-alto-preto"),
+    previewImagemUrl: imagemAvatarWeb("calcados", "tenis-cano-alto-preto"),
   },
   {
     codigo: "tenis-skate",
@@ -289,6 +309,8 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     descricao: "Cano baixo, sola grossa, estilo skatista.",
     tipo: TipoItemLoja.CALCADO,
     precoMoedas: 150,
+    imagemUrl: imagemAvatarWeb("calcados", "tenis-skate"),
+    previewImagemUrl: imagemAvatarWeb("calcados", "tenis-skate"),
   },
   {
     codigo: "bota-coturno",
@@ -296,6 +318,8 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     descricao: "Cano alto, cadarço cruzado, sola grossa.",
     tipo: TipoItemLoja.CALCADO,
     precoMoedas: 220,
+    imagemUrl: imagemAvatarWeb("calcados", "bota-coturno"),
+    previewImagemUrl: imagemAvatarWeb("calcados", "bota-coturno"),
   },
 
   // Itens consumiveis (issue #35): podem ser comprados varias vezes e acumulam
