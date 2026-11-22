@@ -1,6 +1,5 @@
 import type { TurmaDashboardRepository } from './dashboardTurma.repository';
-import type { DesempenhoListaDTO } from './dto/dashboardTurma.types';
-import type { TopErrosResponseDTO } from './dto/dashboardTurma.types';
+import type { DesempenhoListaDTO, TopErrosResponseDTO } from './dto/dashboardTurma.types';
 
 /**
  * Service do dashboard da turma (visao do professor).
@@ -276,7 +275,7 @@ export class TurmaDashboardService {
   async getTopQuestoesComMaisErros(turmaId: string, listaTurmaId: string, professorId: string): Promise<TopErrosResponseDTO> {
     const lista = await this.repository.findRespostasParaRankingErros(turmaId, listaTurmaId);
 
-    if (!lista || lista.turma.professorId !== professorId) {
+    if (lista?.turma?.professorId !== professorId) {
       throw new Error('Lista não encontrada ou não pertence a esta turma.');
     }
 
