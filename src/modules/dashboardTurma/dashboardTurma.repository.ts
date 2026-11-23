@@ -116,4 +116,59 @@ export class TurmaDashboardRepository {
       },
     });
   }
+
+  /**
+   * Busca as respostas de uma lista específica para calcular o ranking de erros.
+   *
+   * @param turmaId Id da turma.
+   * @param idDaLista Id da lista-turma ou da lista de questoes base.
+   */
+  async findRespostasParaRankingErros(turmaId: string, idDaLista: string) {
+    return await prisma.listaTurma.findFirst({
+      where: {
+        turmaId: turmaId,
+        // Aceita tanto o id da lista-turma quanto o id da lista de questoes base.
+        OR: [
+          { id: idDaLista },
+          { listaQuestaoId: idDaLista }
+        ]
+      },
+      include: {
+        turma: {
+          select: {
+            professorId: true,
+          },
+        },
+        listaQuestao: {
+          select: {
+            nome: true,
+            itens: {
+              select: {
+                questaoId: true,
+                ordem: true, 
+                questao: {
+                  select: {
+                    enunciado: true,
+                    respostaCorreta: true,
+                    tema: { select: { nome: true } }
+                  }
+                }
+              }
+            }
+          }
+        },
+        resolucoes: {
+          where: { status: 'SUBMETIDA' }, // Apenas entregas válidas
+          select: {
+            respostas: {
+              select: {
+                questaoId: true,
+                respostaMarcada: true,
+              }
+            }
+          }
+        }
+      }
+    });
+  }
 }
