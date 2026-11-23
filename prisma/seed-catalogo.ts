@@ -233,7 +233,7 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
   // preco do modelo-base; a imagem e a mesma arte usada no overlay do avatar.
   {
     codigo: "loiro-castanho",
-    nome: "Loiro → Castanho",
+    nome: "Liso Castanho",
     descricao: "O corte loiro clássico, agora em castanho.",
     tipo: TipoItemLoja.CABELO,
     precoMoedas: 120,
@@ -242,7 +242,7 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
   },
   {
     codigo: "loiro-ruivo",
-    nome: "Loiro → Ruivo",
+    nome: "Liso Ruivo",
     descricao: "O corte loiro clássico, agora em ruivo.",
     tipo: TipoItemLoja.CABELO,
     precoMoedas: 120,
@@ -269,7 +269,7 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
   },
   {
     codigo: "moicano-loiro",
-    nome: "Moicano Loiro",
+    nome: "Topete Loiro",
     descricao: "O moicano clássico, agora em loiro.",
     tipo: TipoItemLoja.CABELO,
     precoMoedas: 120,
@@ -278,7 +278,7 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
   },
   {
     codigo: "moicano-ruivo",
-    nome: "Moicano Ruivo",
+    nome: "Topete Ruivo",
     descricao: "O moicano clássico, agora em ruivo.",
     tipo: TipoItemLoja.CABELO,
     precoMoedas: 120,
