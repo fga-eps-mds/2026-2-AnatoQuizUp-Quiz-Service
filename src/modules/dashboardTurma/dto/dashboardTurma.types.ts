@@ -26,3 +26,20 @@ export interface DesempenhoListaDTO {
   taxaMediaAcerto: number;
   prazo: string | null;
 }
+
+export interface TopErroQuestaoDTO {
+  questaoId: string;
+  numeroQuestao: number;
+  enunciado: string;
+  tema: string;
+  totalErros: number;
+  totalRespostas: number;
+  percentualErro: number;
+}
+
+export interface TopErrosResponseDTO {
+  listaTurmaId: string;
+  nomeLista: string;
+  totalAlunosResponderam: number;
+  questoes: TopErroQuestaoDTO[];
+}
