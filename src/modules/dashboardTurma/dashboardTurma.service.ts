@@ -1,3 +1,6 @@
+import { PAPEIS } from '@/shared/constants/papeis';
+import { CodigoDeErro } from '@/shared/errors/codigos-de-erro';
+import { ErroAplicacao } from '@/shared/errors/erro-aplicacao';
 import type { TurmaDashboardRepository } from './dashboardTurma.repository';
 import type { DesempenhoListaDTO, TopErrosResponseDTO } from './dto/dashboardTurma.types';
 
@@ -158,17 +161,38 @@ export class TurmaDashboardService {
   /**
    * Desempenho da turma agregado por lista publicada.
    *
-   * Para cada lista: quantos submeteram, quantos pendentes e a taxa media de acerto.
+   * Valida se a turma existe e se o usuario autenticado tem permissao para
+   * consulta-la (professor responsavel ou administrador). Para cada lista:
+   * quantos submeteram, quantos pendentes e a taxa media de acerto.
    *
    * @param turmaId Turma analisada.
-   * @param professorId Professor (reservado p/ futura autorizacao).
+   * @param professorId Id do usuario autenticado.
+   * @param papel Papel do usuario autenticado (opcional; ADMINISTRADOR tem acesso amplo).
    * @returns Uma entrada de desempenho por lista da turma.
+   * @throws ErroAplicacao 404 se a turma nao existir ou 403 se o professor nao for o responsavel.
    */
   async getDesempenhoPorListas(
     turmaId: string,
     professorId: string,
+    papel?: string,
   ): Promise<DesempenhoListaDTO[]> {
-    void professorId;
+    const turma = await this.repository.findTurmaById(turmaId);
+
+    if (!turma) {
+      throw new ErroAplicacao({
+        codigo: CodigoDeErro.NAO_ENCONTRADO,
+        mensagem: 'Turma não encontrada.',
+        codigoStatus: 404,
+      });
+    }
+
+    if (papel !== PAPEIS.ADMINISTRADOR && turma.professorId !== professorId) {
+      throw new ErroAplicacao({
+        codigo: CodigoDeErro.PROIBIDO,
+        mensagem: 'Você não tem permissão para acessar esta turma.',
+        codigoStatus: 403,
+      });
+    }
 
     const [alunosIds, listasTurma] = await Promise.all([
       this.repository.findAlunosByTurmaId(turmaId),
