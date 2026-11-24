@@ -1,4 +1,7 @@
-import { schemaBuscarQuestaoQuiz } from "@/modules/quiz/quiz.schemas";
+import {
+  schemaBuscarQuestaoQuiz,
+  schemaHistoricoQuizQuestoesUsuario,
+} from "@/modules/quiz/quiz.schemas";
 
 describe("schemaBuscarQuestaoQuiz", () => {
   test("valida busca com todos os filtros", () => {
@@ -77,6 +80,23 @@ describe("schemaBuscarQuestaoQuiz", () => {
     const resultado = schemaBuscarQuestaoQuiz.safeParse({
       limit: 10.7,
     });
+
+    expect(resultado.success).toBe(false);
+  });
+});
+
+describe("schemaHistoricoQuizQuestoesUsuario", () => {
+  test.each([
+    ["true", true],
+    ["false", false],
+  ])("converte somenteErros=%s para booleano", (valor, esperado) => {
+    const resultado = schemaHistoricoQuizQuestoesUsuario.parse({ somenteErros: valor });
+
+    expect(resultado.somenteErros).toBe(esperado);
+  });
+
+  test("rejeita valores inválidos para somenteErros", () => {
+    const resultado = schemaHistoricoQuizQuestoesUsuario.safeParse({ somenteErros: "1" });
 
     expect(resultado.success).toBe(false);
   });
