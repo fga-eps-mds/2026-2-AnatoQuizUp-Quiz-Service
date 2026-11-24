@@ -24,6 +24,64 @@ describe('TurmaDashboardController', () => {
     return res as Response;
   };
 
+  describe('histórico individual', () => {
+    const inicio = '2026-07-01T00:00:00Z';
+    const fim = '2026-12-31T23:59:59Z';
+    const requisicao = (query: Record<string, string> = { inicio, fim }) =>
+      ({ params: { id: 'turma-1', alunoId: 'aluno-1' }, usuario: { id: 'prof-1' }, query }) as unknown as Request;
+
+    it('retorna as listas do período consultado', async () => {
+      const listas = [{ listaTurmaId: 'lista-1', nomeLista: 'Anatomia', publicadaEm: inicio, status: 'ENTREGUE' as const }];
+      serviceMock.getHistoricoListasAluno.mockResolvedValue(listas);
+      const res = createMockResponse();
+      await controller.listarHistoricoAluno(requisicao(), res);
+      expect(serviceMock.getHistoricoListasAluno).toHaveBeenCalledWith('turma-1', 'aluno-1', 'prof-1', new Date(inicio), new Date(fim));
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({ listas });
+    });
+
+    it('retorna 200 com lista vazia em um período sem publicações', async () => {
+      serviceMock.getHistoricoListasAluno.mockResolvedValue([]);
+      const res = createMockResponse();
+      await controller.listarHistoricoAluno(requisicao(), res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({ listas: [] });
+    });
+
+    it.each([{}, { inicio }, { fim }, { inicio: 'inválido', fim }, { inicio, fim: 'inválido' }, { inicio: fim, fim: inicio }])(
+      'recusa período inválido %#',
+      async (query) => {
+        const res = createMockResponse();
+        await controller.listarHistoricoAluno(requisicao(query as Record<string, string>), res);
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(serviceMock.getHistoricoListasAluno).not.toHaveBeenCalled();
+      },
+    );
+
+    it('recusa uma sessão ausente', async () => {
+      const res = createMockResponse();
+      await controller.listarHistoricoAluno({ query: { inicio, fim } } as unknown as Request, res);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(serviceMock.getHistoricoListasAluno).not.toHaveBeenCalled();
+    });
+
+    it('recusa uma consulta a outra turma sem expor listas', async () => {
+      serviceMock.getHistoricoListasAluno.mockResolvedValue(null);
+      const res = createMockResponse();
+      await controller.listarHistoricoAluno(requisicao(), res);
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Aluno não encontrado na turma.' });
+    });
+
+    it('retorna um erro genérico se a consulta falhar', async () => {
+      serviceMock.getHistoricoListasAluno.mockRejectedValue(new Error('falha interna'));
+      const res = createMockResponse();
+      await controller.listarHistoricoAluno(requisicao(), res);
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Erro ao buscar histórico do aluno.' });
+    });
+  });
+
   it('deve retornar 200 e os dados do dashboard com sucesso', async () => {
     const req = {
       params: { id: 'turma-123' },
