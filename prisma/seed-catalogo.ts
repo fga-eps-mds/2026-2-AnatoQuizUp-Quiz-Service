@@ -17,7 +17,7 @@ const avatar = (seed: string, skinColor: string) =>
 
 const GRADIENTE_OURO = "linear-gradient(135deg, #FCD34D 0%, #D4AF37 100%)";
 
-// Itens de avatar (acessorio/luva/calcado) sao arte propria, servida pelo Web em
+// Itens de avatar (acessorio/luva/calcado/cabelo) sao arte propria, servida pelo Web em
 // public/avatar/<categoria>/<codigo>.png — caminho relativo, resolvido no proprio
 // dominio do Web que exibe a loja (CosmeticPreview), sem depender de host externo.
 const imagemAvatarWeb = (categoria: string, codigo: string) => `/avatar/${categoria}/${codigo}.png`;
@@ -320,6 +320,99 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     precoMoedas: 220,
     imagemUrl: imagemAvatarWeb("luvas", "luva-goleiro"),
     previewImagemUrl: imagemAvatarWeb("luvas", "luva-goleiro"),
+  },
+
+  // Cabelos novos (US36, #199 T1.1). Recolor de um estilo existente mantem o
+  // preco do modelo-base; a imagem e a mesma arte usada no overlay do avatar.
+  {
+    codigo: "loiro-castanho",
+    nome: "Liso Castanho",
+    descricao: "O corte loiro clássico, agora em castanho.",
+    tipo: TipoItemLoja.CABELO,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("cabelo", "cabelo-loiro-castanho"),
+    previewImagemUrl: imagemAvatarWeb("cabelo", "cabelo-loiro-castanho"),
+  },
+  {
+    codigo: "loiro-ruivo",
+    nome: "Liso Ruivo",
+    descricao: "O corte loiro clássico, agora em ruivo.",
+    tipo: TipoItemLoja.CABELO,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("cabelo", "cabelo-loiro-ruivo"),
+    previewImagemUrl: imagemAvatarWeb("cabelo", "cabelo-loiro-ruivo"),
+  },
+  {
+    codigo: "cacheado-loiro",
+    nome: "Cacheado Loiro",
+    descricao: "O corte cacheado clássico, agora em loiro.",
+    tipo: TipoItemLoja.CABELO,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("cabelo", "cabelo-cacheado-loiro"),
+    previewImagemUrl: imagemAvatarWeb("cabelo", "cabelo-cacheado-loiro"),
+  },
+  {
+    codigo: "cacheado-castanho",
+    nome: "Cacheado Castanho",
+    descricao: "O corte cacheado clássico, agora em castanho.",
+    tipo: TipoItemLoja.CABELO,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("cabelo", "cabelo-cacheado-castanho"),
+    previewImagemUrl: imagemAvatarWeb("cabelo", "cabelo-cacheado-castanho"),
+  },
+  {
+    codigo: "moicano-loiro",
+    nome: "Topete Loiro",
+    descricao: "O moicano clássico, agora em loiro.",
+    tipo: TipoItemLoja.CABELO,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("cabelo", "cabelo-moicano-loiro"),
+    previewImagemUrl: imagemAvatarWeb("cabelo", "cabelo-moicano-loiro"),
+  },
+  {
+    codigo: "moicano-ruivo",
+    nome: "Topete Ruivo",
+    descricao: "O moicano clássico, agora em ruivo.",
+    tipo: TipoItemLoja.CABELO,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("cabelo", "cabelo-moicano-ruivo"),
+    previewImagemUrl: imagemAvatarWeb("cabelo", "cabelo-moicano-ruivo"),
+  },
+  {
+    codigo: "curto-cacheado",
+    nome: "Curto Cacheado",
+    descricao: "Corte curto cacheado, estilo masculino.",
+    tipo: TipoItemLoja.CABELO,
+    precoMoedas: 150,
+    imagemUrl: imagemAvatarWeb("cabelo", "cabelo-curto-cacheado"),
+    previewImagemUrl: imagemAvatarWeb("cabelo", "cabelo-curto-cacheado"),
+  },
+  {
+    codigo: "trancas",
+    nome: "Tranças",
+    descricao: "Tranças gêmeas com contas nas pontas.",
+    tipo: TipoItemLoja.CABELO,
+    precoMoedas: 150,
+    imagemUrl: imagemAvatarWeb("cabelo", "cabelo-trancas"),
+    previewImagemUrl: imagemAvatarWeb("cabelo", "cabelo-trancas"),
+  },
+  {
+    codigo: "curto-grisalho",
+    nome: "Curto Grisalho",
+    descricao: "Corte curto grisalho, cheio de estilo.",
+    tipo: TipoItemLoja.CABELO,
+    precoMoedas: 220,
+    imagemUrl: imagemAvatarWeb("cabelo", "cabelo-curto-grisalho"),
+    previewImagemUrl: imagemAvatarWeb("cabelo", "cabelo-curto-grisalho"),
+  },
+  {
+    codigo: "curto-cacheado-loiro",
+    nome: "Curto Cacheado Loiro",
+    descricao: "O corte curto cacheado, agora em loiro.",
+    tipo: TipoItemLoja.CABELO,
+    precoMoedas: 120,
+    imagemUrl: imagemAvatarWeb("cabelo", "cabelo-curto-cacheado-loiro"),
+    previewImagemUrl: imagemAvatarWeb("cabelo", "cabelo-curto-cacheado-loiro"),
   },
 
   // Itens consumiveis (issue #35): podem ser comprados varias vezes e acumulam
