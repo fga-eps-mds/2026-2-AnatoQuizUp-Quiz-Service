@@ -115,6 +115,7 @@ enum TipoItemLoja {
   DICA
   POTENCIALIZADOR
   LUVA
+  CALCADO
 }
 
 enum OrigemItemInventario {
