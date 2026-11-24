@@ -4,6 +4,34 @@ const prisma = new PrismaClient();
 
 // Repository do dashboard da turma: consultas Prisma para o professor montar metricas.
 export class TurmaDashboardRepository {
+  async findHistoricoListasAluno(
+    turmaId: string,
+    alunoId: string,
+    professorId: string,
+    inicio: Date,
+    fim: Date,
+  ) {
+    return prisma.turma.findFirst({
+      where: { id: turmaId, professorId, excluidoEm: null, alunos: { some: { alunoId, excluidoEm: null } } },
+      select: {
+        listas: {
+          where: { criadoEm: { gte: inicio, lte: fim }, listaQuestao: { excluidoEm: null } },
+          orderBy: [{ criadoEm: 'asc' }, { id: 'asc' }],
+          select: {
+            id: true,
+            criadoEm: true,
+            listaQuestao: { select: { nome: true } },
+            resolucoes: {
+              where: { alunoId, status: 'SUBMETIDA' },
+              take: 1,
+              select: { status: true },
+            },
+          },
+        },
+      },
+    });
+  }
+
   /**
    * Busca metadados basicos da turma (dono) para validacao de acesso.
    *

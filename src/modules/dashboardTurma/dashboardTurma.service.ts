@@ -14,6 +14,18 @@ import type { DesempenhoListaDTO, TopErrosResponseDTO } from './dto/dashboardTur
 export class TurmaDashboardService {
   constructor(private readonly repository: TurmaDashboardRepository) {}
 
+  async getHistoricoListasAluno(turmaId: string, alunoId: string, professorId: string, inicio: Date, fim: Date) {
+    const turma = await this.repository.findHistoricoListasAluno(turmaId, alunoId, professorId, inicio, fim);
+    if (!turma) return null;
+
+    return turma.listas.map((lista) => ({
+      listaTurmaId: lista.id,
+      nomeLista: lista.listaQuestao.nome,
+      publicadaEm: lista.criadoEm.toISOString(),
+      status: lista.resolucoes.length > 0 ? 'ENTREGUE' as const : 'PENDENTE' as const,
+    }));
+  }
+
   /**
    * Desempenho individual de cada aluno da turma (geral e por tema).
    *
