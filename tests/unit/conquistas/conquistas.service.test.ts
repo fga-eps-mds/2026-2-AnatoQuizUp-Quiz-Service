@@ -212,6 +212,27 @@ describe("ConquistaService", () => {
         message: MENSAGENS.conquistaNaoEncontrada,
       });
     });
+
+    test("e idempotente quando o destaque ja esta no estado pedido", async () => {
+      repository.buscarDesbloqueioPorId.mockResolvedValue({ ...criarDesbloqueio(), destaque: true });
+
+      const resultado = await service.alterarDestaque("usuario-id", "id", true);
+
+      expect(resultado).toEqual({ sucesso: true });
+      expect(repository.contarConquistasDestacadas).not.toHaveBeenCalled();
+      expect(repository.alterarDestaque).not.toHaveBeenCalled();
+    });
+
+    test("nao verifica o limite de destaques ao remover um destaque", async () => {
+      repository.buscarDesbloqueioPorId.mockResolvedValue({ ...criarDesbloqueio(), destaque: true });
+      repository.alterarDestaque.mockResolvedValue({ count: 1 });
+
+      const resultado = await service.alterarDestaque("usuario-id", "id", false);
+
+      expect(repository.contarConquistasDestacadas).not.toHaveBeenCalled();
+      expect(repository.alterarDestaque).toHaveBeenCalledWith("usuario-id", "id", false);
+      expect(resultado).toEqual({ sucesso: true });
+    });
   });
 
   describe("buscarConquistasDestacadas", () => {
@@ -468,6 +489,20 @@ describe("ConquistaService", () => {
       expect(repository.buscarOuCriarProgresso).not.toHaveBeenCalled();
     });
 
+    test("deve incrementar progresso em total de acertos do tema", async () => {
+      jest.spyOn(service, "criarConquistaPadraoTema").mockResolvedValue(undefined);
+
+      const conquista = criarConquista();
+      repository.buscarConquistaTema.mockResolvedValue(conquista);
+      repository.buscarOuCriarProgresso.mockResolvedValue({ valorProgresso: 3 });
+
+      const spy = jest.spyOn(service, "atualizarConquista").mockResolvedValue([]);
+
+      await service.processarTotalAcertosTema("usuario-1", "tema-1", "Matemática");
+
+      expect(spy).toHaveBeenCalledWith("usuario-1", conquista, 4);
+    });
+
     test("deve lançar erro quando não conseguir registrar progresso da conquista por tema", async () => {
       jest.spyOn(service, "criarConquistaPadraoTema").mockResolvedValue(undefined);
 
@@ -509,6 +544,16 @@ describe("ConquistaService", () => {
       await service.processarStreak("user-1", false);
 
       expect(spy).toHaveBeenCalledWith("user-1", conquista, 0);
+    });
+
+    test("deve lançar erro quando não conseguir registrar progresso do streak", async () => {
+      repository.buscarConquistaStreak.mockResolvedValue(criarConquista());
+      repository.buscarOuCriarProgresso.mockResolvedValue(null);
+
+      await expect(service.processarStreak("user-1", true)).rejects.toMatchObject({
+        codigo: CodigoDeErro.RECURSO_NAO_ENCONTRADO,
+        message: "Não foi possível registrar progresso em conquista",
+      });
     });
 
     describe("atualizarConquista", () => {
@@ -597,6 +642,36 @@ describe("ConquistaService", () => {
         });
       });
 
+      test("deve incluir o item exclusivo concedido junto ao desbloqueio", async () => {
+        repository.atualizarProgresso.mockResolvedValue({
+          valorProgresso: 10,
+        });
+
+        repository.criarDesbloqueioComRecompensas.mockResolvedValue({
+          desbloqueio: { id: "desbloqueio-1" },
+          moedasConcedidas: 30,
+          saldoMoedas: 30,
+          itemConcedido: {
+            id: "item-1",
+            codigo: "cod-1",
+            nome: "Item",
+            descricao: "Descricao do item",
+            tipo: "COSMETICO",
+            valor: null,
+            imagemUrl: "https://exemplo.com/img.png",
+            previewImagemUrl: null,
+          },
+        });
+
+        const resultado = await service.atualizarConquista(usuarioId, conquista, 100);
+
+        expect(resultado[0].itemConcedido).toMatchObject({
+          id: "item-1",
+          codigo: "cod-1",
+          nome: "Item",
+        });
+      });
+
       test("deve desbloquear múltiplos tiers atingidos pelo progresso", async () => {
         repository.atualizarProgresso.mockResolvedValue({
           valorProgresso: 1000,
@@ -618,6 +693,121 @@ describe("ConquistaService", () => {
         expect(repository.criarDesbloqueioComRecompensas).toHaveBeenCalledTimes(
           resultado.length,
         );
+      });
+    });
+  });
+
+  describe("buscarDetalheConquista", () => {
+    test("deve exigir usuário autenticado", async () => {
+      await expect(service.buscarDetalheConquista(undefined, "conquista-id")).rejects.toMatchObject({
+        codigo: CodigoDeErro.NAO_AUTORIZADO,
+        message: MENSAGENS.usuarioNaoEncontrado,
+      });
+    });
+
+    test("deve lançar erro quando a conquista não é encontrada", async () => {
+      repository.buscarProgressoConquistaUsuario.mockResolvedValue(null);
+
+      await expect(
+        service.buscarDetalheConquista("usuario-id", "conquista-id"),
+      ).rejects.toMatchObject({
+        codigo: CodigoDeErro.NAO_ENCONTRADO,
+        message: MENSAGENS.conquistaNaoEncontrada,
+      });
+    });
+
+    test("deve retornar o detalhe consolidado da conquista", async () => {
+      repository.buscarProgressoConquistaUsuario.mockResolvedValue(criarConquistaComProgresso());
+
+      const resultado = await service.buscarDetalheConquista("usuario-id", "conquista-id");
+
+      expect(resultado).toMatchObject({
+        id: "conquista-id",
+        valorProgresso: 10,
+        proximoTier: "PRATA",
+      });
+    });
+  });
+
+  describe("listarDestaquesUsuarios", () => {
+    test("devolve uma lista vazia para usuarios sem destaques e preenche quem tem", async () => {
+      const destaque = {
+        id: "desbloqueio-1",
+        usuarioId: "usuario-1",
+        tier: "BRONZE",
+        conquistadoEm: new Date(),
+        conquista: {
+          id: "conquista-1",
+          nome: "Conquista",
+          descricao: "Descricao",
+          tipoConquista: "TOTAL_ACERTOS",
+          tema: null,
+        },
+      };
+      repository.listarDestaquesUsuarios.mockResolvedValue([destaque]);
+
+      const resultado = await service.listarDestaquesUsuarios(["usuario-1", "usuario-2"]);
+
+      expect(resultado["usuario-2"]).toEqual([]);
+      expect(resultado["usuario-1"]).toHaveLength(1);
+      expect(resultado["usuario-1"][0]).toMatchObject({
+        desbloqueioId: "desbloqueio-1",
+        conquistaId: "conquista-1",
+        nome: "Conquista",
+      });
+    });
+  });
+
+  describe("converterProgressoConsolidado (via listarProgressoUsuario)", () => {
+    test("usa zero como progresso quando o usuario ainda nao tem registro", async () => {
+      repository.listarProgressoUsuario.mockResolvedValue({
+        data: [{ ...criarConquistaComProgresso(), usuarios: [] }],
+        total: 1,
+      });
+
+      const resultado = await service.listarProgressoUsuario({}, "usuario-id");
+
+      expect(resultado.dados[0].valorProgresso).toBe(0);
+    });
+
+    test("nao monta tiers quando o tipo de conquista nao tem configuracao", async () => {
+      repository.listarProgressoUsuario.mockResolvedValue({
+        data: [{ ...criarConquistaComProgresso(), tipoConquista: "TIPO_SEM_CONFIG" }],
+        total: 1,
+      });
+
+      const resultado = await service.listarProgressoUsuario({}, "usuario-id");
+
+      expect(resultado.dados[0]).toMatchObject({
+        tiers: [],
+        proximoTier: null,
+        proximoObjetivo: null,
+        percentual: 0,
+      });
+    });
+
+    test("marca 100% e nenhum proximo tier quando tudo ja foi desbloqueado", async () => {
+      repository.listarProgressoUsuario.mockResolvedValue({
+        data: [
+          {
+            ...criarConquistaComProgresso(),
+            usuarios: [{ valorProgresso: 200 }],
+            desbloqueios: [
+              { id: "d-bronze", tier: "BRONZE", destaque: false, conquistadoEm: new Date() },
+              { id: "d-prata", tier: "PRATA", destaque: false, conquistadoEm: new Date() },
+              { id: "d-ouro", tier: "OURO", destaque: false, conquistadoEm: new Date() },
+            ],
+          },
+        ],
+        total: 1,
+      });
+
+      const resultado = await service.listarProgressoUsuario({}, "usuario-id");
+
+      expect(resultado.dados[0]).toMatchObject({
+        proximoTier: null,
+        proximoObjetivo: null,
+        percentual: 100,
       });
     });
   });

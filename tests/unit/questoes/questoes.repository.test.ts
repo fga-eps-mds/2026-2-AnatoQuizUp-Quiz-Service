@@ -153,6 +153,51 @@ describe("QuestionRepository", () => {
     expect(resposta).toMatchObject({questao: questao, temaCriado: true});
   });
 
+  test("cria questao do tipo certo-errado usando apenas as alternativas C e E", async () => {
+    const tema = { id: "tema-1", nome: "Anatomia" };
+    const questao = { id: "questao-1" };
+    const transacao = {
+      tema: {
+        findFirst: jest.fn().mockResolvedValue(tema),
+        create: jest.fn(),
+      },
+      questao: {
+        create: jest.fn().mockResolvedValue(questao),
+      },
+    };
+    transactionMock.mockImplementation((callback) => callback(transacao));
+
+    await repository.criar(
+      {
+        tema: "Anatomia",
+        enunciado: "Enunciado",
+        tipo: "CERTO_ERRADO",
+        dificuldade: "FACIL",
+        imagem: "https://cdn.example.com/imagem.png",
+        alternativaCorreta: "C",
+        saibaMais: "Explicacao",
+        alternativas: { C: "Certo", E: "Errado" },
+      },
+      "professor-1",
+    );
+
+    expect(transacao.questao.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          alternativas: {
+            create: {
+              alternativaA: "",
+              alternativaB: "",
+              alternativaC: "Certo",
+              alternativaD: "",
+              alternativaE: "Errado",
+            },
+          },
+        }),
+      }),
+    );
+  });
+
   test("criar persiste os campos de classificacao e usa default de origemQuestao quando ausente", async () => {
     const tema = { id: "tema-1", nome: "Anatomia" };
     const transacao = {
