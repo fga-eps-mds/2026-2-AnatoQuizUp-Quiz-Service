@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+export const schemaParamsHistoricoAluno = z.object({
+  id: z.string().cuid(),
+  alunoId: z.string().trim().min(1),
+});
+
 // Schemas Zod dos params dos dashboards de turma.
 
 // Params do dashboard da turma: apenas o id da turma.

@@ -49,6 +49,28 @@ describe('TurmaDashboardRepository', () => {
     expect(result).toEqual(mockTurma);
   });
 
+  it('restringe o histórico à turma do professor, ao aluno matriculado e ao período', async () => {
+    const inicio = new Date('2026-01-01T00:00:00Z');
+    const fim = new Date('2026-06-30T23:59:59Z');
+    (prismaMock.turma.findFirst as jest.Mock).mockResolvedValue(null);
+
+    await expect(repository.findHistoricoListasAluno('turma-2', 'aluno-1', 'professor-1', inicio, fim))
+      .resolves.toBeNull();
+
+    expect(prismaMock.turma.findFirst).toHaveBeenCalledWith({
+      where: { id: 'turma-2', professorId: 'professor-1', excluidoEm: null, alunos: { some: { alunoId: 'aluno-1', excluidoEm: null } } },
+      select: {
+        listas: expect.objectContaining({
+          where: { criadoEm: { gte: inicio, lte: fim }, listaQuestao: { excluidoEm: null } },
+          orderBy: [{ criadoEm: 'asc' }, { id: 'asc' }],
+          select: expect.objectContaining({
+            resolucoes: expect.objectContaining({ where: { alunoId: 'aluno-1', status: 'SUBMETIDA' } }),
+          }),
+        }),
+      },
+    });
+  });
+
   it('deve buscar e retornar apenas os IDs dos alunos de uma turma', async () => {
     const mockMatriculas = [{ alunoId: 'aluno-1' }, { alunoId: 'aluno-2' }];
     (prismaMock.turmaAluno.findMany as jest.Mock).mockResolvedValue(mockMatriculas);

@@ -5,7 +5,7 @@ import { validarRequisicao } from '@/shared/middlewares/validacao.middleware';
 import { TurmaDashboardRepository } from './dashboardTurma.repository';
 import { TurmaDashboardService } from './dashboardTurma.service';
 import { TurmaDashboardController } from './dashboardTurma.controller';
-import { schemaParamsDashboard, schemaParamsListaDashboard } from './dashboardTruma.schemas';
+import { schemaParamsDashboard, schemaParamsHistoricoAluno, schemaParamsListaDashboard } from './dashboardTruma.schemas';
 
 const dashboardRouter = Router();
 
@@ -47,6 +47,13 @@ dashboardRouter.get(
   apenasGestao,
   validarRequisicao(schemaParamsListaDashboard, 'params'),
   turmaDashboardController.listarDesempenhoListaIndividual
+);
+
+dashboardRouter.get(
+  '/:id/alunos/:alunoId/historico-listas',
+  middlewarePapeis(PAPEIS.PROFESSOR),
+  validarRequisicao(schemaParamsHistoricoAluno, 'params'),
+  turmaDashboardController.listarHistoricoAluno,
 );
 
 // GET top erros dos alunos em uma lista especifica.

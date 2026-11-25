@@ -12,6 +12,31 @@ describe('TurmaDashboardService', () => {
     service = new TurmaDashboardService(repoMock);
   });
 
+  describe('getHistoricoListasAluno', () => {
+    const inicio = new Date('2026-07-01T00:00:00Z');
+    const fim = new Date('2026-12-31T23:59:59Z');
+
+    it('mantém a ordem e distingue entrega submetida de pendência', async () => {
+      repoMock.findHistoricoListasAluno.mockResolvedValue({
+        listas: [
+          { id: 'lista-1', criadoEm: inicio, listaQuestao: { nome: 'Anatomia' }, resolucoes: [{ status: 'SUBMETIDA' }] },
+          { id: 'lista-2', criadoEm: fim, listaQuestao: { nome: 'Osteologia' }, resolucoes: [] },
+        ],
+      });
+      await expect(service.getHistoricoListasAluno('turma-1', 'aluno-1', 'prof-1', inicio, fim)).resolves.toEqual([
+        { listaTurmaId: 'lista-1', nomeLista: 'Anatomia', publicadaEm: inicio.toISOString(), status: 'ENTREGUE' },
+        { listaTurmaId: 'lista-2', nomeLista: 'Osteologia', publicadaEm: fim.toISOString(), status: 'PENDENTE' },
+      ]);
+      expect(repoMock.findHistoricoListasAluno).toHaveBeenCalledWith('turma-1', 'aluno-1', 'prof-1', inicio, fim);
+    });
+
+    it('distingue um período vazio de uma turma indisponível', async () => {
+      repoMock.findHistoricoListasAluno.mockResolvedValueOnce({ listas: [] }).mockResolvedValueOnce(null);
+      await expect(service.getHistoricoListasAluno('turma-1', 'aluno-1', 'prof-1', inicio, fim)).resolves.toEqual([]);
+      await expect(service.getHistoricoListasAluno('turma-2', 'aluno-1', 'prof-1', inicio, fim)).resolves.toBeNull();
+    });
+  });
+
   it('deve retornar totais zerados quando a turma não tiver alunos', async () => {
     repoMock.findAlunosByTurmaId.mockResolvedValue([]);
 
