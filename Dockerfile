@@ -3,6 +3,7 @@ FROM node:24-alpine AS deps
 WORKDIR /app
 
 COPY package*.json ./
+COPY patches ./patches
 
 RUN npm ci
 
@@ -25,6 +26,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package*.json ./
+COPY patches ./patches
 RUN npm ci --omit=dev
 
 COPY --from=build /app/dist ./dist

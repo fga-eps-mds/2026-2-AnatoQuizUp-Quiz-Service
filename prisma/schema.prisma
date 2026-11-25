@@ -810,3 +810,60 @@ model EventoMissao {
   @@unique([periodoId, tipo, chave])
   @@map("eventos_missao")
 }
+
+enum StatusCasoOsce {
+  RASCUNHO
+  PUBLICADO
+}
+
+// Caso clinico cadastrado pelo professor para a simulacao OSCE (US26). So os campos
+// estruturados do protocolo (dados gerais, contextualizacao e roteiro do paciente);
+// a rubrica de avaliacao pertence a outra US (US27) e nao mora aqui.
+model CasoOsce {
+  id String @id @default(cuid())
+
+  // Dados gerais (opcionais: o rascunho comeca vazio e e preenchido passo a passo)
+  titulo             String?
+  especialidade      String?
+  dificuldade        Dificuldade?
+  diagnosticoEsperado String?
+
+  // Contextualizacao
+  local          String?
+  papelEstudante String?
+  idadePaciente  Int?
+  sexoPaciente   String?
+  queixaPaciente String?
+
+  // Roteiro do paciente
+  perfilPaciente   String?
+  historiaSintomas String?
+  exameFisico      String?
+
+  status      StatusCasoOsce @default(RASCUNHO)
+  criadoPorId String
+
+  exames ExameCasoOsce[]
+
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+  excluidoEm   DateTime?
+
+  @@map("casos_osce")
+}
+
+// Exame complementar de um caso OSCE: nome + resultado, exibido ao aluno quando
+// ele solicita o exame durante a simulacao (US25).
+model ExameCasoOsce {
+  id String @id @default(cuid())
+
+  nome      String
+  resultado String
+
+  casoOsceId String
+  casoOsce   CasoOsce @relation(fields: [casoOsceId], references: [id], onDelete: Cascade)
+
+  criadoEm DateTime @default(now())
+
+  @@map("exames_caso_osce")
+}
