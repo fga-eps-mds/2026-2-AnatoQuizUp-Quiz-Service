@@ -165,17 +165,20 @@ describe('TurmaDashboardService', () => {
 
   describe('getDesempenhoPorListas', () => {
     it('deve retornar lista vazia quando a turma nao tiver listas publicadas', async () => {
+      repoMock.findTurmaById.mockResolvedValue({ id: 'turma-123', professorId: 'prof-123' });
       repoMock.findAlunosByTurmaId.mockResolvedValue(['aluno-1', 'aluno-2']);
       repoMock.findDesempenhoPorListasDaTurma.mockResolvedValue([]);
 
-      const result = await service.getDesempenhoPorListas('turma-123', 'prof-123');
+      const result = await service.getDesempenhoPorListas('turma-123', 'prof-123', 'PROFESSOR');
 
+      expect(repoMock.findTurmaById).toHaveBeenCalledWith('turma-123');
       expect(repoMock.findAlunosByTurmaId).toHaveBeenCalledWith('turma-123');
       expect(repoMock.findDesempenhoPorListasDaTurma).toHaveBeenCalledWith('turma-123');
       expect(result).toEqual([]);
     });
 
     it('deve calcular submissoes, pendentes e taxa media por lista', async () => {
+      repoMock.findTurmaById.mockResolvedValue({ id: 'turma-123', professorId: 'prof-123' });
       repoMock.findAlunosByTurmaId.mockResolvedValue(['aluno-1', 'aluno-2', 'aluno-3']);
       repoMock.findDesempenhoPorListasDaTurma.mockResolvedValue([
         {
@@ -206,7 +209,7 @@ describe('TurmaDashboardService', () => {
         ReturnType<TurmaDashboardRepository['findDesempenhoPorListasDaTurma']>
       >);
 
-      const result = await service.getDesempenhoPorListas('turma-123', 'prof-123');
+      const result = await service.getDesempenhoPorListas('turma-123', 'prof-123', 'PROFESSOR');
 
       expect(result).toEqual([
         {
@@ -231,6 +234,7 @@ describe('TurmaDashboardService', () => {
     });
 
     it('deve evitar pendentes negativos se houver submissoes acima do total de alunos', async () => {
+      repoMock.findTurmaById.mockResolvedValue({ id: 'turma-123', professorId: 'prof-123' });
       repoMock.findAlunosByTurmaId.mockResolvedValue(['aluno-1']);
       repoMock.findDesempenhoPorListasDaTurma.mockResolvedValue([
         {
@@ -246,10 +250,47 @@ describe('TurmaDashboardService', () => {
         ReturnType<TurmaDashboardRepository['findDesempenhoPorListasDaTurma']>
       >);
 
-      const result = await service.getDesempenhoPorListas('turma-123', 'prof-123');
+      const result = await service.getDesempenhoPorListas('turma-123', 'prof-123', 'PROFESSOR');
 
       expect(result[0].totalSubmeteram).toBe(2);
       expect(result[0].totalPendentes).toBe(0);
+    });
+
+    it('deve permitir que administrador consulte listas de turma de outro professor', async () => {
+      repoMock.findTurmaById.mockResolvedValue({ id: 'turma-123', professorId: 'prof-dono' });
+      repoMock.findAlunosByTurmaId.mockResolvedValue(['aluno-1']);
+      repoMock.findDesempenhoPorListasDaTurma.mockResolvedValue([]);
+
+      const result = await service.getDesempenhoPorListas('turma-123', 'admin-1', 'ADMINISTRADOR');
+
+      expect(result).toEqual([]);
+      expect(repoMock.findDesempenhoPorListasDaTurma).toHaveBeenCalledWith('turma-123');
+    });
+
+    it('deve lancar erro 404 quando a turma nao existir', async () => {
+      repoMock.findTurmaById.mockResolvedValue(null);
+
+      await expect(
+        service.getDesempenhoPorListas('turma-inexistente', 'prof-123', 'PROFESSOR'),
+      ).rejects.toMatchObject({
+        codigoStatus: 404,
+        message: 'Turma não encontrada.',
+      });
+
+      expect(repoMock.findDesempenhoPorListasDaTurma).not.toHaveBeenCalled();
+    });
+
+    it('deve lancar erro 403 quando o professor nao for o responsavel pela turma', async () => {
+      repoMock.findTurmaById.mockResolvedValue({ id: 'turma-123', professorId: 'prof-dono' });
+
+      await expect(
+        service.getDesempenhoPorListas('turma-123', 'prof-intruso', 'PROFESSOR'),
+      ).rejects.toMatchObject({
+        codigoStatus: 403,
+        message: 'Você não tem permissão para acessar esta turma.',
+      });
+
+      expect(repoMock.findDesempenhoPorListasDaTurma).not.toHaveBeenCalled();
     });
   });
 

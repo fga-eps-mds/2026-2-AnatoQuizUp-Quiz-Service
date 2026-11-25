@@ -7,16 +7,14 @@ import {
   TipoQuestao 
 } from "@prisma/client";
 
-interface AuthenticatedRequest extends Request {
-  usuario?: {
-    id: string;
-    papel: string;
-  };
-}
-
 jest.mock("@/shared/middlewares/papeis.middleware", () => ({
   middlewarePapeis: () => (req: Request, _res: Response, next: NextFunction) => {
-    (req as AuthenticatedRequest).usuario = { id: "prof-teste-123", papel: "PROFESSOR" };
+    req.usuario = {
+      id: "prof-teste-123",
+      email: "professor@teste.com",
+      papel: "PROFESSOR",
+      status: "ATIVO",
+    };
     next();
   },
 }));
@@ -125,6 +123,24 @@ describe("Testes de Integração - Dashboard Turma", () => {
       const body = response.body as Array<{ nomeLista: string; totalSubmeteram: number }>;
       expect(body[0].nomeLista).toBe("Lista 1");
       expect(body[0].totalSubmeteram).toBe(1);
+    });
+
+    it("deve retornar 403 quando o professor não for o responsável pela turma", async () => {
+      const outraTurma = await prisma.turma.create({
+        data: { codigo: "T-OUTRA", nome: "Turma Privada", semestre: "1", ano: 2026, descricao: "Privada", professorId: "outro-professor" }
+      });
+
+      const response = await request(app).get(`/api/v1/turmas/${outraTurma.id}/listas`);
+
+      expect(response.status).toBe(403);
+    });
+
+    it("deve retornar 404 quando a turma não existir", async () => {
+      const validCuid = "clm123456789012345678901";
+
+      const response = await request(app).get(`/api/v1/turmas/${validCuid}/listas`);
+
+      expect(response.status).toBe(404);
     });
   });
 
