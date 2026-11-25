@@ -3,6 +3,9 @@ import { PrismaClient } from '@prisma/client';
 
 jest.mock('@prisma/client', () => {
   const mPrisma = {
+    turma: {
+      findFirst: jest.fn(),
+    },
     turmaAluno: {
       findMany: jest.fn(),
     },
@@ -25,6 +28,25 @@ describe('TurmaDashboardRepository', () => {
     repository = new TurmaDashboardRepository();
     prismaMock = new PrismaClient() as jest.Mocked<PrismaClient>;
     jest.clearAllMocks();
+  });
+
+  it('deve buscar metadados basicos de uma turma ativa por id', async () => {
+    const mockTurma = { id: 'turma-123', professorId: 'prof-123' };
+    (prismaMock.turma.findFirst as jest.Mock).mockResolvedValue(mockTurma);
+
+    const result = await repository.findTurmaById('turma-123');
+
+    expect(prismaMock.turma.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'turma-123',
+        excluidoEm: null,
+      },
+      select: {
+        id: true,
+        professorId: true,
+      },
+    });
+    expect(result).toEqual(mockTurma);
   });
 
   it('deve buscar e retornar apenas os IDs dos alunos de uma turma', async () => {

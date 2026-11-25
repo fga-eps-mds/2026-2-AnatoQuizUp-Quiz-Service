@@ -1,8 +1,9 @@
 import type { Request, Response } from 'express';
+import { CodigoDeErro } from '../../../src/shared/errors/codigos-de-erro';
+import { ErroAplicacao } from '../../../src/shared/errors/erro-aplicacao';
 import { TurmaDashboardController } from '../../../src/modules/dashboardTurma/dashboardTurma.controller';
 import { TurmaDashboardService } from '../../../src/modules/dashboardTurma/dashboardTurma.service';
 import type { TurmaDashboardRepository } from '../../../src/modules/dashboardTurma/dashboardTurma.repository';
-import { ErroAplicacao } from '../../../src/shared/errors/erro-aplicacao';
 
 jest.mock('../../../src/modules/dashboardTurma/dashboardTurma.service');
 
@@ -147,7 +148,7 @@ describe('TurmaDashboardController', () => {
     it('deve retornar 200 e os dados de desempenho por listas', async () => {
       const req = {
         params: { id: 'turma-123' },
-        usuario: { id: 'prof-123' },
+        usuario: { id: 'prof-123', papel: 'PROFESSOR' },
       } as unknown as Request;
 
       const res = createMockResponse();
@@ -168,7 +169,7 @@ describe('TurmaDashboardController', () => {
 
       await controller.listarPorListas(req, res);
 
-      expect(serviceMock.getDesempenhoPorListas).toHaveBeenCalledWith('turma-123', 'prof-123');
+      expect(serviceMock.getDesempenhoPorListas).toHaveBeenCalledWith('turma-123', 'prof-123', 'PROFESSOR');
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(mockData);
     });
@@ -180,13 +181,57 @@ describe('TurmaDashboardController', () => {
       await controller.listarPorListas(req, res);
 
       expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith({ error: 'UsuÃ¡rio nÃ£o autenticado ou sessÃ£o expirada.' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'Usuário não autenticado ou sessão expirada.' });
+    });
+
+    it('deve retornar 403 se o professor nao tiver permissao para a turma', async () => {
+      const req = {
+        params: { id: 'turma-123' },
+        usuario: { id: 'prof-intruso', papel: 'PROFESSOR' },
+      } as unknown as Request;
+      const res = createMockResponse();
+
+      serviceMock.getDesempenhoPorListas.mockRejectedValue(
+        new ErroAplicacao({
+          codigo: CodigoDeErro.PROIBIDO,
+          mensagem: 'Você não tem permissão para acessar esta turma.',
+          codigoStatus: 403,
+        }),
+      );
+
+      await controller.listarPorListas(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Você não tem permissão para acessar esta turma.',
+      });
+    });
+
+    it('deve retornar 404 se a turma nao for encontrada', async () => {
+      const req = {
+        params: { id: 'turma-inexistente' },
+        usuario: { id: 'prof-123', papel: 'PROFESSOR' },
+      } as unknown as Request;
+      const res = createMockResponse();
+
+      serviceMock.getDesempenhoPorListas.mockRejectedValue(
+        new ErroAplicacao({
+          codigo: CodigoDeErro.NAO_ENCONTRADO,
+          mensagem: 'Turma não encontrada.',
+          codigoStatus: 404,
+        }),
+      );
+
+      await controller.listarPorListas(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Turma não encontrada.' });
     });
 
     it('deve retornar 500 se o service lancar um erro', async () => {
       const req = {
         params: { id: 'turma-123' },
-        usuario: { id: 'prof-123' },
+        usuario: { id: 'prof-123', papel: 'PROFESSOR' },
       } as unknown as Request;
 
       const res = createMockResponse();

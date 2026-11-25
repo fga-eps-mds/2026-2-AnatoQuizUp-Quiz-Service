@@ -11,6 +11,7 @@ import {
   schemaParamsListaDashboard,
 } from './dashboardTruma.schemas';
 
+
 const dashboardRouter = Router();
 
 // Montagem das dependencias do dashboard da turma.
@@ -59,6 +60,14 @@ dashboardRouter.get(
   middlewarePapeis(PAPEIS.PROFESSOR),
   validarRequisicao(schemaParamsDetalheEntrega, 'params'),
   turmaDashboardController.detalharEntrega,
+);
+
+// GET top erros dos alunos em uma lista especifica.
+dashboardRouter.get(
+  '/:id/listas/:listaId/top-erros',
+  apenasGestao,
+  validarRequisicao(schemaParamsListaDashboard, 'params'),
+  turmaDashboardController.getTopErros
 );
 
 export { dashboardRouter };

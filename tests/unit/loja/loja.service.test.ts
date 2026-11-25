@@ -321,4 +321,117 @@ describe("Testa Loja Service", () => {
 
     expect(repository.comprarItem).not.toHaveBeenCalled();
   });
+
+  test("deve lançar erro interno ao usar item sem o repository de uso configurado", async () => {
+    await expect(service.usarItem("usuario-id", "cafe-id")).rejects.toMatchObject({
+      codigoStatus: 500,
+    });
+  });
+
+  test("deve lançar erro interno ao listar historico de usos sem o repository configurado", async () => {
+    await expect(service.listarHistoricoUsos("usuario-id", {})).rejects.toMatchObject({
+      codigoStatus: 500,
+    });
+  });
+
+  describe("listarHistorico", () => {
+    test("deve lançar erro interno sem o repository de uso configurado", async () => {
+      await expect(service.listarHistorico("usuario-id", {})).rejects.toMatchObject({
+        codigoStatus: 500,
+      });
+    });
+
+    test("deve lançar erro ao consultar historico sem usuario autenticado", async () => {
+      await expect(service.listarHistorico(undefined, {})).rejects.toBeInstanceOf(ErroAplicacao);
+    });
+
+    test("deve combinar compras e usos, ordenados do mais recente ao mais antigo", async () => {
+      const itemLoja = criarItemLoja({ id: "item-1", nome: "Coruja", efeito: null });
+      const usoItemRepository = {
+        listarHistoricoCompleto: jest.fn().mockResolvedValue([
+          {
+            id: "uso-1",
+            itemLojaId: "item-1",
+            status: "ATIVO",
+            ativadoEm: new Date("2026-06-16T08:00:00.000Z"),
+            aplicadoEm: null,
+            questaoId: null,
+            itemLoja: { id: "item-1", nome: "Coruja", efeito: null },
+          },
+        ]),
+      } as unknown as jest.Mocked<UsoItemRepository>;
+      const repositoryComCompras = {
+        ...repository,
+        listarHistoricoCompras: jest.fn().mockResolvedValue([
+          {
+            id: "compra-sem-item",
+            criadoEm: new Date("2026-06-16T09:00:00.000Z"),
+            quantidade: -5,
+            quantidadeItem: null,
+            itemLoja: null,
+          },
+          {
+            id: "compra-sem-quantidade",
+            criadoEm: new Date("2026-06-16T09:30:00.000Z"),
+            quantidade: -3,
+            quantidadeItem: null,
+            itemLoja,
+          },
+          {
+            id: "compra-1",
+            criadoEm: new Date("2026-06-16T10:00:00.000Z"),
+            quantidade: -10,
+            quantidadeItem: 2,
+            itemLoja,
+          },
+        ]),
+      } as unknown as jest.Mocked<LojaRepository>;
+      const serviceComHistorico = new LojaService(repositoryComCompras, usoItemRepository);
+
+      const resultado = await serviceComHistorico.listarHistorico("usuario-id", {
+        page: 1,
+        limit: 10,
+      });
+
+      // A compra sem itemLoja (excluido) e descartada; sobram as outras tres, mais recente primeiro.
+      expect(resultado.dados).toEqual([
+        expect.objectContaining({ id: "compra-1", acao: "COMPRA", quantidade: 2, custoCompra: 10 }),
+        expect.objectContaining({
+          id: "compra-sem-quantidade",
+          acao: "COMPRA",
+          quantidade: 1,
+          custoCompra: 3,
+        }),
+        expect.objectContaining({
+          id: "uso-1",
+          acao: "USO",
+          efeitoUso: "Potencializador ativado.",
+          statusUso: "ATIVO",
+        }),
+      ]);
+      expect(resultado.metadados).toMatchObject({ total: 3 });
+    });
+  });
+
+  test("usa a descricao padrao quando o item usado nao tem efeito cadastrado", async () => {
+    const usoItemRepository = {
+      ativarPotencializador: jest.fn().mockResolvedValue({
+        uso: {
+          id: "uso-id",
+          itemLojaId: "cafe-id",
+          status: "ATIVO",
+          ativadoEm: new Date("2026-06-16T10:00:00.000Z"),
+          aplicadoEm: null,
+          questaoId: null,
+          itemLoja: { nome: "Cafe do Foco", efeito: null },
+        },
+        quantidadeRestante: 1,
+      }),
+    } as unknown as jest.Mocked<UsoItemRepository>;
+    const serviceComUso = new LojaService(repository, usoItemRepository);
+
+    const resultado = await serviceComUso.usarItem("usuario-id", "cafe-id");
+
+    expect(resultado.uso.efeito).toBe("Potencializador ativo.");
+  });
 });

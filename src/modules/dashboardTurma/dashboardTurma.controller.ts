@@ -60,21 +60,26 @@ export class TurmaDashboardController {
    * GET desempenho da turma agregado por lista de questoes.
    *
    * @param req Requisicao com o id da turma na rota (professor vem do token).
-   * @param res Resposta HTTP (200 com o desempenho por lista; 401/500 em erro).
+   * @param res Resposta HTTP (200 com o desempenho por lista; 401/403/404/500 em erro).
    */
   listarPorListas = async (req: Request, res: Response) => {
     try {
       const turmaId = req.params.id as string;
       const professorId = req.usuario?.id;
+      const papel = req.usuario?.papel;
 
       if (!professorId) {
-        return res.status(401).json({ error: 'UsuÃ¡rio nÃ£o autenticado ou sessÃ£o expirada.' });
+        return res.status(401).json({ error: 'Usuário não autenticado ou sessão expirada.' });
       }
 
-      const data = await this.service.getDesempenhoPorListas(turmaId, professorId);
+      const data = await this.service.getDesempenhoPorListas(turmaId, professorId, papel);
 
       return res.status(200).json(data);
-    } catch (error) {
+    } catch (error: unknown) {
+      if (error instanceof ErroAplicacao) {
+        return res.status(error.codigoStatus).json({ error: error.message });
+      }
+
       console.error('Erro no TurmaDashboardController [listas]:', error);
       return res.status(500).json({ error: 'Erro ao buscar desempenho por lista.' });
     }
@@ -100,8 +105,6 @@ export class TurmaDashboardController {
 
       return res.status(200).json(data);
     } catch (error: unknown) {
-      console.error('Erro no TurmaDashboardController [lista individual]:', error);
-
       console.error('Erro no TurmaDashboardController [lista individual]:', error);
 
       // Verificamos se é uma instância de Error antes de acessar a propriedade .message
@@ -138,4 +141,38 @@ export class TurmaDashboardController {
       return res.status(500).json({ error: 'Erro ao buscar detalhe da entrega.' });
     }
   };
+
+
+  /**
+   * GET top erros dos alunos em uma lista especifica.
+   *
+   * @param req Requisicao com o id da turma e o listaId na rota.
+   * @param res Resposta HTTP (200 com o ranking de erros; 404 se a lista nao pertence a turma).
+   */
+  getTopErros = async (req: Request, res: Response) => {
+    try {
+      const turmaId = req.params.id as string;
+      const listaTurmaId = req.params.listaId as string;
+      const professorId = req.usuario?.id;
+
+      // Validação de segurança: exige professor autenticado.
+      if (!professorId) {
+        return res.status(401).json({ error: 'Usuário não autenticado ou sessão expirada.' });
+      }
+
+      const resultado = await this.service.getTopQuestoesComMaisErros(turmaId, listaTurmaId, professorId);
+
+      return res.status(200).json(resultado);
+    } catch (error: unknown) {
+      console.error('Erro no TurmaDashboardController [top-erros]:', error);
+
+      // Tratamento de erro específico conforme definido no Service
+      if (error instanceof Error && error.message === 'Lista não encontrada ou não pertence a esta turma.') {
+        return res.status(404).json({ error: error.message });
+      }
+
+      return res.status(500).json({ error: 'Erro interno ao buscar as questões com mais erros.' });
+    }
+  };
 }
+

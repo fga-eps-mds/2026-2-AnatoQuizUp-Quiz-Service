@@ -1,6 +1,7 @@
-import type { TurmaDashboardRepository } from './dashboardTurma.repository';
-import type { DesempenhoListaDTO } from './dto/dashboardTurma.types';
+import { PAPEIS } from '@/shared/constants/papeis';
+import { CodigoDeErro } from '@/shared/errors/codigos-de-erro';
 import { ErroAplicacao } from '@/shared/errors/erro-aplicacao';
+import type { TurmaDashboardRepository } from './dashboardTurma.repository';
 import type { AlternativaQuestao } from '@prisma/client';
 
 type AlternativasDaQuestao = {
@@ -24,6 +25,9 @@ const textoAlternativa = (alternativas: AlternativasDaQuestao | null, alternativ
 
   return textos[alternativa] ?? alternativa;
 };
+
+import type { DesempenhoListaDTO, TopErrosResponseDTO } from './dto/dashboardTurma.types';
+
 
 /**
  * Service do dashboard da turma (visao do professor).
@@ -182,17 +186,38 @@ export class TurmaDashboardService {
   /**
    * Desempenho da turma agregado por lista publicada.
    *
-   * Para cada lista: quantos submeteram, quantos pendentes e a taxa media de acerto.
+   * Valida se a turma existe e se o usuario autenticado tem permissao para
+   * consulta-la (professor responsavel ou administrador). Para cada lista:
+   * quantos submeteram, quantos pendentes e a taxa media de acerto.
    *
    * @param turmaId Turma analisada.
-   * @param professorId Professor (reservado p/ futura autorizacao).
+   * @param professorId Id do usuario autenticado.
+   * @param papel Papel do usuario autenticado (opcional; ADMINISTRADOR tem acesso amplo).
    * @returns Uma entrada de desempenho por lista da turma.
+   * @throws ErroAplicacao 404 se a turma nao existir ou 403 se o professor nao for o responsavel.
    */
   async getDesempenhoPorListas(
     turmaId: string,
     professorId: string,
+    papel?: string,
   ): Promise<DesempenhoListaDTO[]> {
-    void professorId;
+    const turma = await this.repository.findTurmaById(turmaId);
+
+    if (!turma) {
+      throw new ErroAplicacao({
+        codigo: CodigoDeErro.NAO_ENCONTRADO,
+        mensagem: 'Turma não encontrada.',
+        codigoStatus: 404,
+      });
+    }
+
+    if (papel !== PAPEIS.ADMINISTRADOR && turma.professorId !== professorId) {
+      throw new ErroAplicacao({
+        codigo: CodigoDeErro.PROIBIDO,
+        mensagem: 'Você não tem permissão para acessar esta turma.',
+        codigoStatus: 403,
+      });
+    }
 
     const [alunosIds, listasTurma] = await Promise.all([
       this.repository.findAlunosByTurmaId(turmaId),
@@ -395,4 +420,82 @@ export class TurmaDashboardService {
       questoes,
     };
   }
+
+  async getTopQuestoesComMaisErros(turmaId: string, listaTurmaId: string, professorId: string): Promise<TopErrosResponseDTO> {
+    const lista = await this.repository.findRespostasParaRankingErros(turmaId, listaTurmaId);
+
+    if (lista?.turma?.professorId !== professorId) {
+      throw new Error('Lista não encontrada ou não pertence a esta turma.');
+    }
+
+    const totalAlunosResponderam = lista.resolucoes.length;
+
+    // Mapeia informações das questões para acesso rápido
+    const infoQuestoes = new Map<string, { numero: number; enunciado: string; tema: string; respostaCorreta: string }>();
+    lista.listaQuestao.itens.forEach(item => {
+      infoQuestoes.set(item.questaoId, {
+        numero: item.ordem, 
+        enunciado: item.questao.enunciado,
+        tema: item.questao.tema.nome,
+        respostaCorreta: item.questao.respostaCorreta
+      });
+    });
+
+    // Acumulador de estatísticas por questão
+    const estatisticas = new Map<string, { erros: number; totalRespostas: number }>();
+    infoQuestoes.forEach((_, questaoId) => {
+      estatisticas.set(questaoId, { erros: 0, totalRespostas: 0 });
+    });
+
+    // Processa as respostas (T05.2)
+    lista.resolucoes.forEach(resolucao => {
+      resolucao.respostas.forEach(resposta => {
+        const info = infoQuestoes.get(resposta.questaoId);
+        if (!info) return; 
+
+        const stats = estatisticas.get(resposta.questaoId)!;
+        stats.totalRespostas += 1;
+        
+        // Verifica se errou
+        if (resposta.respostaMarcada !== info.respostaCorreta) {
+          stats.erros += 1;
+        }
+      });
+    });
+
+    // Transforma em Array e calcula percentual
+    const questoesComErros = Array.from(estatisticas.entries())
+      .map(([questaoId, stats]) => {
+        const info = infoQuestoes.get(questaoId)!;
+        return {
+          questaoId,
+          numeroQuestao: info.numero,
+          enunciado: info.enunciado,
+          tema: info.tema,
+          totalErros: stats.erros,
+          totalRespostas: stats.totalRespostas,
+          percentualErro: stats.totalRespostas > 0 ? Math.round((stats.erros / stats.totalRespostas) * 100) : 0,
+        };
+      })
+      .filter(q => q.totalErros > 0); 
+
+    // Ordenação: Maior erro (desc), depois menor número da questão (asc) 
+    questoesComErros.sort((a, b) => {
+      if (b.totalErros !== a.totalErros) {
+        return b.totalErros - a.totalErros;
+      }
+      return a.numeroQuestao - b.numeroQuestao;
+    });
+
+    // Pega o Top 3
+    const top3 = questoesComErros.slice(0, 3);
+
+    return {
+      listaTurmaId: lista.id,
+      nomeLista: lista.listaQuestao.nome,
+      totalAlunosResponderam,
+      questoes: top3,
+    };
+  }
+
 }
