@@ -7,6 +7,37 @@ import { ErroAplicacao } from '@/shared/errors/erro-aplicacao';
 export class TurmaDashboardController {
   constructor(private readonly service: TurmaDashboardService) {}
 
+  listarHistoricoAluno = async (req: Request, res: Response) => {
+    const professorId = req.usuario?.id;
+    if (!professorId) return res.status(401).json({ error: 'Sessão inválida.' });
+
+    const { inicio, fim } = req.query;
+    if (typeof inicio !== 'string' || typeof fim !== 'string') {
+      return res.status(400).json({ error: 'Informe o início e o fim do período.' });
+    }
+
+    const dataInicio = new Date(inicio);
+    const dataFim = new Date(fim);
+    if (!Number.isFinite(dataInicio.getTime()) || !Number.isFinite(dataFim.getTime()) || dataInicio > dataFim) {
+      return res.status(400).json({ error: 'Período inválido.' });
+    }
+
+    try {
+      const listas = await this.service.getHistoricoListasAluno(
+        req.params.id as string,
+        req.params.alunoId as string,
+        professorId,
+        dataInicio,
+        dataFim,
+      );
+      if (!listas) return res.status(404).json({ error: 'Aluno não encontrado na turma.' });
+      return res.status(200).json({ listas });
+    } catch (error) {
+      console.error('Erro ao consultar histórico do aluno:', error);
+      return res.status(500).json({ error: 'Erro ao buscar histórico do aluno.' });
+    }
+  };
+
   /**
    * GET visao macro da turma: indicadores gerais de desempenho.
    *
@@ -172,6 +203,35 @@ export class TurmaDashboardController {
       }
 
       return res.status(500).json({ error: 'Erro interno ao buscar as questões com mais erros.' });
+    }
+  };
+
+  /** GET evolucao do aluno por tema entre as listas publicadas da turma. */
+  listarEvolucaoTemas = async (req: Request, res: Response) => {
+    try {
+      const professorId = req.usuario?.id;
+      if (!professorId) {
+        return res.status(401).json({ error: 'Usuário não autenticado ou sessão expirada.' });
+      }
+
+      const inicio = typeof req.query.inicio === 'string' ? new Date(req.query.inicio) : undefined;
+      const fim = typeof req.query.fim === 'string' ? new Date(req.query.fim) : undefined;
+      const data = await this.service.getEvolucaoTemasAluno(
+        req.params.id as string,
+        req.params.alunoId as string,
+        professorId,
+        inicio,
+        fim,
+      );
+
+      return res.status(200).json(data);
+    } catch (error) {
+      if (error instanceof ErroAplicacao) {
+        return res.status(error.codigoStatus).json({ error: error.message });
+      }
+
+      console.error('Erro no TurmaDashboardController [evolucao por tema]:', error);
+      return res.status(500).json({ error: 'Erro ao buscar evolução por tema.' });
     }
   };
 }

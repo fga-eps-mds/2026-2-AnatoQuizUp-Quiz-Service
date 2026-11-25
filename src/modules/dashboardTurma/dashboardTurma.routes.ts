@@ -8,9 +8,11 @@ import { TurmaDashboardController } from './dashboardTurma.controller';
 import {
   schemaParamsDashboard,
   schemaParamsDetalheEntrega,
+  schemaParamsHistoricoAluno,
+  schemaParamsEvolucaoTemas,
   schemaParamsListaDashboard,
+  schemaQueryEvolucaoTemas,
 } from './dashboardTruma.schemas';
-
 
 const dashboardRouter = Router();
 
@@ -62,12 +64,27 @@ dashboardRouter.get(
   turmaDashboardController.detalharEntrega,
 );
 
+dashboardRouter.get(
+  '/:id/alunos/:alunoId/historico-listas',
+  middlewarePapeis(PAPEIS.PROFESSOR),
+  validarRequisicao(schemaParamsHistoricoAluno, 'params'),
+  turmaDashboardController.listarHistoricoAluno,
+);
+
 // GET top erros dos alunos em uma lista especifica.
 dashboardRouter.get(
   '/:id/listas/:listaId/top-erros',
   apenasGestao,
   validarRequisicao(schemaParamsListaDashboard, 'params'),
   turmaDashboardController.getTopErros
+);
+
+dashboardRouter.get(
+  '/:id/alunos/:alunoId/evolucao-temas',
+  middlewarePapeis(PAPEIS.PROFESSOR),
+  validarRequisicao(schemaParamsEvolucaoTemas, 'params'),
+  validarRequisicao(schemaQueryEvolucaoTemas, 'query'),
+  turmaDashboardController.listarEvolucaoTemas,
 );
 
 export { dashboardRouter };

@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+export const schemaParamsHistoricoAluno = z.object({
+  id: z.string().cuid(),
+  alunoId: z.string().trim().min(1),
+});
+
 // Schemas Zod dos params dos dashboards de turma.
 
 // Params do dashboard da turma: apenas o id da turma.
@@ -26,10 +31,26 @@ export const schemaParamsListaDashboard = z.object({
 });
 
 // Params do detalhamento de uma entrega: turma, publicacao e aluno consultados.
-export const schemaParamsDetalheEntrega = schemaParamsListaDashboard.extend({
+export const schemaParamsDetalheEntrega = schemaParamsHistoricoAluno.extend({
+  listaId: z.string().trim().min(1),
+});
+
+export const schemaParamsEvolucaoTemas = schemaParamsDashboard.extend({
   alunoId: z.string({
     message: 'O ID do aluno é obrigatório.',
-  }).cuid({
-    message: 'Formato de ID do aluno inválido.',
+  }).trim().min(1, {
+    message: 'O ID do aluno é obrigatório.',
   }),
 });
+
+export const schemaQueryEvolucaoTemas = z
+  .object({
+    inicio: z.iso.datetime({ offset: true }).optional(),
+    fim: z.iso.datetime({ offset: true }).optional(),
+  })
+  .refine(({ inicio, fim }) => Boolean(inicio) === Boolean(fim), {
+    message: 'As datas de início e fim devem ser informadas juntas.',
+  })
+  .refine(({ inicio, fim }) => !inicio || !fim || new Date(inicio) <= new Date(fim), {
+    message: 'A data de início deve ser anterior ou igual à data de fim.',
+  });

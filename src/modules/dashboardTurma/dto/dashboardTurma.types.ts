@@ -43,3 +43,29 @@ export interface TopErrosResponseDTO {
   totalAlunosResponderam: number;
   questoes: TopErroQuestaoDTO[];
 }
+
+export type StatusResultadoTemaDTO = 'SUBMETIDA' | 'EM_ANDAMENTO' | 'NAO_RESPONDEU';
+
+export interface ResultadoTemaListaDTO {
+  listaTurmaId: string;
+  nomeLista: string;
+  publicadaEm: string;
+  status: StatusResultadoTemaDTO;
+  acertos: number | null;
+  totalQuestoes: number;
+  taxaAcerto: number | null;
+  variacaoPp: number | null;
+}
+
+export interface EvolucaoTemaDTO {
+  temaId: string;
+  nome: string;
+  totalResultadosValidos: number;
+  mensagem: string | null;
+  resultados: ResultadoTemaListaDTO[];
+}
+
+export interface EvolucaoTemasAlunoResponseDTO {
+  alunoId: string;
+  temas: EvolucaoTemaDTO[];
+}

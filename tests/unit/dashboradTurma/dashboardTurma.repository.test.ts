@@ -49,6 +49,48 @@ describe('TurmaDashboardRepository', () => {
     expect(result).toEqual(mockTurma);
   });
 
+  it('restringe o histórico à turma do professor, ao aluno matriculado e ao período', async () => {
+    const inicio = new Date('2026-01-01T00:00:00Z');
+    const fim = new Date('2026-06-30T23:59:59Z');
+    (prismaMock.turma.findFirst as jest.Mock).mockResolvedValue(null);
+
+    await expect(repository.findHistoricoListasAluno('turma-2', 'aluno-1', 'professor-1', inicio, fim))
+      .resolves.toBeNull();
+
+    expect(prismaMock.turma.findFirst).toHaveBeenCalledWith({
+      where: { id: 'turma-2', professorId: 'professor-1', excluidoEm: null, alunos: { some: { alunoId: 'aluno-1', excluidoEm: null } } },
+      select: {
+        listas: expect.objectContaining({
+          where: { criadoEm: { gte: inicio, lte: fim }, listaQuestao: { excluidoEm: null } },
+          orderBy: [{ criadoEm: 'asc' }, { id: 'asc' }],
+          select: expect.objectContaining({
+            resolucoes: expect.objectContaining({ where: { alunoId: 'aluno-1', status: 'SUBMETIDA' } }),
+          }),
+        }),
+      },
+    });
+  });
+
+  it('deve validar o vinculo entre professor, turma e aluno', async () => {
+    (prismaMock.turma.findFirst as jest.Mock).mockResolvedValue({ id: 'turma-123' });
+
+    const result = await repository.professorTemAcessoAoAluno(
+      'turma-123',
+      'aluno-123',
+      'professor-123',
+    );
+
+    expect(prismaMock.turma.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'turma-123',
+        professorId: 'professor-123',
+        alunos: { some: { alunoId: 'aluno-123' } },
+      },
+      select: { id: true },
+    });
+    expect(result).toBe(true);
+  });
+
   it('deve buscar e retornar apenas os IDs dos alunos de uma turma', async () => {
     const mockMatriculas = [{ alunoId: 'aluno-1' }, { alunoId: 'aluno-2' }];
     (prismaMock.turmaAluno.findMany as jest.Mock).mockResolvedValue(mockMatriculas);
@@ -132,6 +174,64 @@ describe('TurmaDashboardRepository', () => {
       },
     });
     expect(result).toEqual(mockLista);
+  });
+  it('deve buscar listas, temas e respostas do aluno no periodo em ordem cronologica', async () => {
+    const mockListas = [{ id: 'lista-turma-1' }];
+    (prismaMock.listaTurma.findMany as jest.Mock).mockResolvedValue(mockListas);
+    const inicio = new Date('2026-01-01T00:00:00.000Z');
+    const fim = new Date('2026-06-30T23:59:59.999Z');
+
+    const result = await repository.findListasParaEvolucaoTemas(
+      'turma-123',
+      'aluno-123',
+      'professor-123',
+      inicio,
+      fim,
+    );
+
+    expect(prismaMock.listaTurma.findMany).toHaveBeenCalledWith({
+      where: {
+        turmaId: 'turma-123',
+        turma: {
+          professorId: 'professor-123',
+          alunos: { some: { alunoId: 'aluno-123' } },
+        },
+        criadoEm: { gte: inicio, lte: fim },
+      },
+      orderBy: { criadoEm: 'asc' },
+      include: {
+        listaQuestao: {
+          select: {
+            nome: true,
+            itens: {
+              orderBy: { ordem: 'asc' },
+              select: {
+                questao: {
+                  select: {
+                    id: true,
+                    respostaCorreta: true,
+                    tema: { select: { id: true, nome: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+        resolucoes: {
+          where: { alunoId: 'aluno-123' },
+          select: {
+            status: true,
+            respostas: {
+              select: {
+                questaoId: true,
+                respostaMarcada: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(result).toEqual(mockListas);
   });
 
   it('deve buscar a entrega somente quando professor, turma e aluno estiverem vinculados', async () => {
