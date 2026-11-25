@@ -34,6 +34,8 @@ async function main() {
   await prisma.questao.deleteMany({});
   await prisma.tema.deleteMany({});
   await prisma.turma.deleteMany({});
+  // casoOsce/exameCasoOsce NAO entram aqui: o unico caso validado com o PO vem de
+  // migration (20261122160000_seed_caso_osce_alcool), nao do seed, e nao pode ser apagado.
 
   const PROFESSOR_ID = "cmp7fx97j00034hyqazqwrk3e";
   const ALUNO_1_ID = "cmp7fx99d00044hyqq4msqsyt";
@@ -733,6 +735,8 @@ async function main() {
 
   }
 
+  // 8. Casos OSCE (US26): o unico caso validado com o PO vem da migration
+  // 20261122160000_seed_caso_osce_alcool, nao mais daqui (evita duplicar).
 }
 
 main()
