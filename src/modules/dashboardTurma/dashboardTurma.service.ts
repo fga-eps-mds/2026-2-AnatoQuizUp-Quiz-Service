@@ -10,7 +10,6 @@ import type {
   StatusResultadoTemaDTO,
   TopErrosResponseDTO,
 } from './dto/dashboardTurma.types';
-import { ErroAplicacao } from '@/shared/errors/erro-aplicacao';
 
 const mensagemComparacao = (totalResultadosValidos: number): string | null => {
   if (totalResultadosValidos === 0) return 'Nenhuma entrega concluída para comparação.';
