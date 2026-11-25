@@ -355,4 +355,71 @@ describe('TurmaDashboardController', () => {
       });
     });
   });
+  describe('listarEvolucaoTemas', () => {
+    it('deve retornar a evolucao e converter o periodo recebido na consulta', async () => {
+      const req = {
+        params: { id: 'turma-1', alunoId: 'aluno-1' },
+        query: {
+          inicio: '2026-07-01T00:00:00.000Z',
+          fim: '2026-12-31T23:59:59.999Z',
+        },
+        usuario: { id: 'professor-1' },
+      } as unknown as Request;
+      const res = createMockResponse();
+      const mockData = {
+        alunoId: 'aluno-1',
+        temas: [],
+      };
+
+      serviceMock.getEvolucaoTemasAluno.mockResolvedValue(mockData);
+
+      await controller.listarEvolucaoTemas(req, res);
+
+      expect(serviceMock.getEvolucaoTemasAluno).toHaveBeenCalledWith(
+        'turma-1',
+        'aluno-1',
+        'professor-1',
+        new Date('2026-07-01T00:00:00.000Z'),
+        new Date('2026-12-31T23:59:59.999Z'),
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(mockData);
+    });
+
+    it('deve retornar 401 sem professor autenticado', async () => {
+      const req = {
+        params: { id: 'turma-1', alunoId: 'aluno-1' },
+        query: {},
+      } as unknown as Request;
+      const res = createMockResponse();
+
+      await controller.listarEvolucaoTemas(req, res);
+
+      expect(serviceMock.getEvolucaoTemasAluno).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Usuário não autenticado ou sessão expirada.' });
+    });
+
+    it('deve preservar o erro de acesso retornado pelo servico', async () => {
+      const req = {
+        params: { id: 'turma-1', alunoId: 'aluno-1' },
+        query: {},
+        usuario: { id: 'professor-sem-acesso' },
+      } as unknown as Request;
+      const res = createMockResponse();
+
+      serviceMock.getEvolucaoTemasAluno.mockRejectedValue(new ErroAplicacao({
+        mensagem: 'Aluno não encontrado ou sem permissão de acesso.',
+        codigo: 'NAO_ENCONTRADO',
+        codigoStatus: 404,
+      }));
+
+      await controller.listarEvolucaoTemas(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Aluno não encontrado ou sem permissão de acesso.',
+      });
+    });
+  });
 });
