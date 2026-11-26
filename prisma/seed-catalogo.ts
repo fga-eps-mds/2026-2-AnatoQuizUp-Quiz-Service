@@ -7,13 +7,15 @@ import {
 } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 
+import {
+  CODIGO_RECOMPENSA_PRIMEIROS_ACERTOS,
+  removerItensLegados,
+} from "../src/modules/loja/itens-legados";
+
 const prisma = new PrismaClient();
 
 const iconeAnatomia = (nome: string) =>
   `https://api.iconify.design/game-icons/${nome}.svg?color=%23ffffff`;
-
-const avatar = (seed: string, skinColor: string) =>
-  `https://api.dicebear.com/9.x/avataaars/svg?seed=${seed}&skinColor=${skinColor}`;
 
 const GRADIENTE_OURO = "linear-gradient(135deg, #FCD34D 0%, #D4AF37 100%)";
 
@@ -23,44 +25,6 @@ const GRADIENTE_OURO = "linear-gradient(135deg, #FCD34D 0%, #D4AF37 100%)";
 const imagemAvatarWeb = (categoria: string, codigo: string) => `/avatar/${categoria}/${codigo}.png`;
 
 const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
-  {
-    codigo: "icone-coruja",
-    nome: "Coruja",
-    descricao: "Para os estudiosos de plantão.",
-    tipo: TipoItemLoja.ICONE_PERFIL,
-    precoMoedas: 60,
-    valor: "linear-gradient(135deg, #71edc8 0%, #00A88F 100%)",
-    imagemUrl: iconeAnatomia("owl"),
-    previewImagemUrl: iconeAnatomia("owl"),
-  },
-  {
-    codigo: "icone-coracao",
-    nome: "Coração",
-    descricao: "O órgão que move tudo.",
-    tipo: TipoItemLoja.ICONE_PERFIL,
-    precoMoedas: 120,
-    valor: "linear-gradient(135deg, #fb7185 0%, #e11d48 100%)",
-    imagemUrl: iconeAnatomia("heart-organ"),
-    previewImagemUrl: iconeAnatomia("heart-organ"),
-  },
-  {
-    codigo: "icone-cerebro",
-    nome: "Cérebro",
-    descricao: "Para as mentes brilhantes.",
-    tipo: TipoItemLoja.ICONE_PERFIL,
-    precoMoedas: 200,
-    valor: "linear-gradient(135deg, #c4b5fd 0%, #7c3aed 100%)",
-    imagemUrl: iconeAnatomia("brain"),
-    previewImagemUrl: iconeAnatomia("brain"),
-  },
-  {
-    codigo: "icone-anatoquiz-dourado",
-    nome: "AnatoQuiz Dourado",
-    descricao: "Ícone premium com a logo do AnatoQuiz em dourado.",
-    tipo: TipoItemLoja.ICONE_PERFIL,
-    precoMoedas: 500,
-    valor: GRADIENTE_OURO,
-  },
   {
     codigo: "moldura-bronze",
     nome: "Bronze",
@@ -92,42 +56,6 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     tipo: TipoItemLoja.MOLDURA,
     precoMoedas: 380,
     valor: "linear-gradient(135deg, #22d3ee 0%, #a855f7 100%)",
-  },
-  {
-    codigo: "avatar-estudioso",
-    nome: "O Estudioso",
-    descricao: "Avatar pronto de estudante.",
-    tipo: TipoItemLoja.AVATAR,
-    precoMoedas: 100,
-    imagemUrl: avatar("Estudioso7", "ae5d29"),
-    previewImagemUrl: avatar("Estudioso7", "ae5d29"),
-  },
-  {
-    codigo: "avatar-mundo-da-lua",
-    nome: "Mundo da Lua",
-    descricao: "Avatar pronto de estudante.",
-    tipo: TipoItemLoja.AVATAR,
-    precoMoedas: 100,
-    imagemUrl: avatar("MundoDaLua3", "d08b5b"),
-    previewImagemUrl: avatar("MundoDaLua3", "d08b5b"),
-  },
-  {
-    codigo: "avatar-nerd",
-    nome: "Nerd de Plantão",
-    descricao: "Avatar pronto de estudante.",
-    tipo: TipoItemLoja.AVATAR,
-    precoMoedas: 100,
-    imagemUrl: avatar("NerdDePlantao", "edb98a"),
-    previewImagemUrl: avatar("NerdDePlantao", "edb98a"),
-  },
-  {
-    codigo: "avatar-modo-tedio",
-    nome: "Modo Tédio",
-    descricao: "Avatar pronto de estudante.",
-    tipo: TipoItemLoja.AVATAR,
-    precoMoedas: 100,
-    imagemUrl: avatar("ModoTedio9", "ffdbb4"),
-    previewImagemUrl: avatar("ModoTedio9", "ffdbb4"),
   },
   {
     codigo: "titulo-calouro-curioso",
@@ -188,45 +116,6 @@ const itensCatalogo: Prisma.ItemLojaCreateInput[] = [
     tipo: TipoItemLoja.PLANO_FUNDO,
     precoMoedas: 350,
     valor: "linear-gradient(135deg, #0A1128 0%, #00214d 100%)",
-  },
-
-  // Itens de aparencia (issue #32): rosto e cabelo, personalizacao do avatar-base.
-  // Um item gratuito de cada tipo garante que a aba nunca fique vazia por padrao.
-  {
-    codigo: "rosto-padrao",
-    nome: "Rosto Padrão",
-    descricao: "Expressão neutra padrão.",
-    tipo: TipoItemLoja.ROSTO,
-    precoMoedas: 0,
-    imagemUrl: avatar("RostoPadrao1", "edb98a"),
-    previewImagemUrl: avatar("RostoPadrao1", "edb98a"),
-  },
-  {
-    codigo: "rosto-sorridente",
-    nome: "Sorridente",
-    descricao: "Rosto com sorriso animado.",
-    tipo: TipoItemLoja.ROSTO,
-    precoMoedas: 150,
-    imagemUrl: avatar("RostoSorridente2", "d08b5b"),
-    previewImagemUrl: avatar("RostoSorridente2", "d08b5b"),
-  },
-  {
-    codigo: "cabelo-padrao",
-    nome: "Cabelo Padrão",
-    descricao: "Corte clássico.",
-    tipo: TipoItemLoja.CABELO,
-    precoMoedas: 0,
-    imagemUrl: avatar("CabeloPadrao1", "ae5d29"),
-    previewImagemUrl: avatar("CabeloPadrao1", "ae5d29"),
-  },
-  {
-    codigo: "cabelo-moicano",
-    nome: "Moicano Colorido",
-    descricao: "Estilo ousado para se destacar.",
-    tipo: TipoItemLoja.CABELO,
-    precoMoedas: 250,
-    imagemUrl: avatar("CabeloMoicano3", "d08b5b"),
-    previewImagemUrl: avatar("CabeloMoicano3", "d08b5b"),
   },
 
   // Acessorios (US36, #199 T1.4): 10 modelos novos, sem base existente pra herdar
@@ -714,43 +603,23 @@ export async function sincronizarCatalogo() {
     where: { id: "total-acertos" },
     update: {
       nome: "Primeiros 5 Acertos",
-      descricao: "Acerte cinco questões para desbloquear um avatar exclusivo.",
+      descricao: "Acerte cinco questões para desbloquear o Óculos de Sol.",
       tipoConquista: TipoConquista.TOTAL_ACERTOS,
       ativo: true,
     },
     create: {
       id: "total-acertos",
       nome: "Primeiros 5 Acertos",
-      descricao: "Acerte cinco questões para desbloquear um avatar exclusivo.",
+      descricao: "Acerte cinco questões para desbloquear o Óculos de Sol.",
       tipoConquista: TipoConquista.TOTAL_ACERTOS,
       ativo: true,
     },
   });
 
-  const avatarExclusivo = await prisma.itemLoja.upsert({
-    where: { codigo: "avatar-explorador-anatomia" },
-    update: {
-      nome: "Explorador da Anatomia",
-      descricao: "Avatar exclusivo para quem conquistou seus primeiros cinco acertos.",
-      tipo: TipoItemLoja.AVATAR,
-      precoMoedas: 0,
-      imagemUrl: avatar("ExploradorAnatomia", "edb98a"),
-      previewImagemUrl: avatar("ExploradorAnatomia", "edb98a"),
-      ativo: true,
-      disponivelNaLoja: false,
-      excluidoEm: null,
-    },
-    create: {
-      codigo: "avatar-explorador-anatomia",
-      nome: "Explorador da Anatomia",
-      descricao: "Avatar exclusivo para quem conquistou seus primeiros cinco acertos.",
-      tipo: TipoItemLoja.AVATAR,
-      precoMoedas: 0,
-      imagemUrl: avatar("ExploradorAnatomia", "edb98a"),
-      previewImagemUrl: avatar("ExploradorAnatomia", "edb98a"),
-      ativo: true,
-      disponivelNaLoja: false,
-    },
+  // A recompensa da conquista era um avatar ilustrado (tipo removido na US39); agora e
+  // um acessorio do avatar-cerebro que ja esta no catalogo.
+  const recompensa = await prisma.itemLoja.findUniqueOrThrow({
+    where: { codigo: CODIGO_RECOMPENSA_PRIMEIROS_ACERTOS },
   });
 
   await prisma.recompensaItemConquista.upsert({
@@ -761,16 +630,27 @@ export async function sincronizarCatalogo() {
       },
     },
     update: {
-      itemLojaId: avatarExclusivo.id,
+      itemLojaId: recompensa.id,
     },
     create: {
       conquistaId: conquista.id,
       tier: TierConquista.BRONZE,
-      itemLojaId: avatarExclusivo.id,
+      itemLojaId: recompensa.id,
     },
   });
 
-  console.log(`Catálogo sincronizado: ${itensCatalogo.length} itens públicos e 1 item exclusivo.`);
+  // Itens do avatar antigo (icones, avatares, rosto e cabelos antigos) saem da loja, do
+  // inventario e do historico, com reembolso do ATP gasto. Idempotente a cada deploy.
+  const remocao = await removerItensLegados(prisma);
+
+  console.log(`Catálogo sincronizado: ${itensCatalogo.length} itens públicos.`);
+  if (remocao.itensRemovidos > 0 || remocao.inventariosRemovidos > 0) {
+    console.log(
+      `Itens legados removidos: ${remocao.itensRemovidos} itens, ${remocao.inventariosRemovidos} inventários, ` +
+        `${remocao.moedasReembolsadas} ATP reembolsados a ${remocao.usuariosReembolsados} usuários, ` +
+        `${remocao.recompensasSubstituidas} recompensas trocadas pelo ${CODIGO_RECOMPENSA_PRIMEIROS_ACERTOS}.`,
+    );
+  }
 }
 
 export const desconectarCatalogo = () => prisma.$disconnect();

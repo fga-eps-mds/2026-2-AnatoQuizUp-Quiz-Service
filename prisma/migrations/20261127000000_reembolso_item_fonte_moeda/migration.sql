@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "FonteMoeda" ADD VALUE 'REEMBOLSO_ITEM';

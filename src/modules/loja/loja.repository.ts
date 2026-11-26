@@ -109,6 +109,8 @@ export class LojaRepository {
         usuarioId,
         fonte: FonteMoeda.COMPRA_ITEM,
         itemLojaId: { not: null },
+        // Itens removidos da loja (excluidos) nao aparecem no historico.
+        itemLoja: { excluidoEm: null },
       },
       include: { itemLoja: true },
       orderBy: { criadoEm: "desc" },

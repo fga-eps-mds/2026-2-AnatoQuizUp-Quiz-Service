@@ -158,7 +158,8 @@ export class UsoItemRepository {
   }
 
   async listarHistorico(usuarioId: string, paginacao: { skip: number; limit: number }) {
-    const where: Prisma.UsoItemWhereInput = { usuarioId };
+    // Itens removidos da loja (excluidos) nao aparecem no historico.
+    const where: Prisma.UsoItemWhereInput = { usuarioId, itemLoja: { excluidoEm: null } };
     const [data, total] = await prisma.$transaction([
       prisma.usoItem.findMany({
         where,
@@ -176,7 +177,7 @@ export class UsoItemRepository {
   // A cronologia unificada aplica a paginacao depois de combinar compras e usos.
   async listarHistoricoCompleto(usuarioId: string) {
     return prisma.usoItem.findMany({
-      where: { usuarioId },
+      where: { usuarioId, itemLoja: { excluidoEm: null } },
       include: { itemLoja: true },
       orderBy: { ativadoEm: "desc" },
     });

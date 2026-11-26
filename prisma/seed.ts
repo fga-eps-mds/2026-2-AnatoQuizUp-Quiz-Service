@@ -4,11 +4,12 @@ import {
   PrismaClient,
   StatusQuestao,
   StatusTurma,
-  TierConquista,
   TipoConquista,
   TipoItemLoja,
   TipoQuestao,
 } from "@prisma/client";
+
+import { desconectarCatalogo, sincronizarCatalogo } from "./seed-catalogo";
 
 const prisma = new PrismaClient();
 
@@ -84,62 +85,14 @@ async function main() {
   console.log("Carteira de moedas criada para o usuário de teste.");
 
   // 3. Criando itens da Loja Virtual (cosméticos)
-  // Categorias: ICONE_PERFIL, MOLDURA, AVATAR, TITULO, PLANO_FUNDO.
+  // Categorias: MOLDURA, TITULO, PLANO_FUNDO (icones e avatares ilustrados sairam na US39).
   // Preços diversificados (recompensa por acerto: FACIL 10 / MEDIA 25 / DIFICIL 50).
-  // `valor` guarda a cor/gradiente decorativo (círculo do ícone, anel da moldura, fundo);
-  // ícones de anatomia vêm do Iconify (silhueta branca); títulos são texto;
-  // o ícone premium (logo dourada do AnatoQuiz) é renderizado no front a partir do `codigo`.
-  const iconeAnatomia = (nome: string) =>
-    `https://api.iconify.design/game-icons/${nome}.svg?color=%23ffffff`;
-  const avatar = (seed: string, skinColor: string) =>
-    `https://api.dicebear.com/9.x/avataaars/svg?seed=${seed}&skinColor=${skinColor}`;
-
+  // `valor` guarda a cor/gradiente decorativo (anel da moldura, fundo); títulos são texto.
   const GRADIENTE_OURO = "linear-gradient(135deg, #FCD34D 0%, #D4AF37 100%)";
 
   await prisma.itemLoja.createMany({
     data: [
       // --- Ícones de perfil (4) ---
-      {
-        codigo: "icone-coruja",
-        nome: "Coruja",
-        descricao: "Para os estudiosos de plantão.",
-        tipo: TipoItemLoja.ICONE_PERFIL,
-        precoMoedas: 60,
-        valor: "linear-gradient(135deg, #71edc8 0%, #00A88F 100%)",
-        imagemUrl: iconeAnatomia("owl"),
-        previewImagemUrl: iconeAnatomia("owl"),
-      },
-      {
-        codigo: "icone-coracao",
-        nome: "Coração",
-        descricao: "O órgão que move tudo.",
-        tipo: TipoItemLoja.ICONE_PERFIL,
-        precoMoedas: 120,
-        valor: "linear-gradient(135deg, #fb7185 0%, #e11d48 100%)",
-        imagemUrl: iconeAnatomia("heart-organ"),
-        previewImagemUrl: iconeAnatomia("heart-organ"),
-      },
-      {
-        codigo: "icone-cerebro",
-        nome: "Cérebro",
-        descricao: "Para as mentes brilhantes.",
-        tipo: TipoItemLoja.ICONE_PERFIL,
-        precoMoedas: 200,
-        valor: "linear-gradient(135deg, #c4b5fd 0%, #7c3aed 100%)",
-        imagemUrl: iconeAnatomia("brain"),
-        previewImagemUrl: iconeAnatomia("brain"),
-      },
-      {
-        codigo: "icone-anatoquiz-dourado",
-        nome: "AnatoQuiz Dourado",
-        descricao: "Ícone premium com a logo do AnatoQuiz em dourado.",
-        tipo: TipoItemLoja.ICONE_PERFIL,
-        precoMoedas: 500,
-        valor: GRADIENTE_OURO,
-        // logo renderizada no front a partir do codigo (asset local)
-      },
-
-      // --- Molduras de ícone de perfil (4) - anel em `valor` ---
       {
         codigo: "moldura-bronze",
         nome: "Bronze",
@@ -174,44 +127,6 @@ async function main() {
       },
 
       // --- Avatares (4) - modelos prontos, sem customização. Mesmo preço (100). ---
-      {
-        codigo: "avatar-estudioso",
-        nome: "O Estudioso",
-        descricao: "Avatar pronto de estudante.",
-        tipo: TipoItemLoja.AVATAR,
-        precoMoedas: 100,
-        imagemUrl: avatar("Estudioso7", "ae5d29"),
-        previewImagemUrl: avatar("Estudioso7", "ae5d29"),
-      },
-      {
-        codigo: "avatar-mundo-da-lua",
-        nome: "Mundo da Lua",
-        descricao: "Avatar pronto de estudante.",
-        tipo: TipoItemLoja.AVATAR,
-        precoMoedas: 100,
-        imagemUrl: avatar("MundoDaLua3", "d08b5b"),
-        previewImagemUrl: avatar("MundoDaLua3", "d08b5b"),
-      },
-      {
-        codigo: "avatar-nerd",
-        nome: "Nerd de Plantão",
-        descricao: "Avatar pronto de estudante.",
-        tipo: TipoItemLoja.AVATAR,
-        precoMoedas: 100,
-        imagemUrl: avatar("NerdDePlantao", "edb98a"),
-        previewImagemUrl: avatar("NerdDePlantao", "edb98a"),
-      },
-      {
-        codigo: "avatar-modo-tedio",
-        nome: "Modo Tédio",
-        descricao: "Avatar pronto de estudante.",
-        tipo: TipoItemLoja.AVATAR,
-        precoMoedas: 100,
-        imagemUrl: avatar("ModoTedio9", "ffdbb4"),
-        previewImagemUrl: avatar("ModoTedio9", "ffdbb4"),
-      },
-
-      // --- Títulos (4) - renderizados como texto ---
       {
         codigo: "titulo-calouro-curioso",
         nome: "Calouro Curioso",
@@ -277,53 +192,9 @@ async function main() {
     ],
   });
 
-  const avatarExclusivo = await prisma.itemLoja.upsert({
-    where: {
-      codigo: "avatar-explorador-anatomia",
-    },
-    update: {
-      nome: "Explorador da Anatomia",
-      descricao: "Avatar exclusivo para quem conquistou seus primeiros cinco acertos.",
-      tipo: TipoItemLoja.AVATAR,
-      precoMoedas: 0,
-      imagemUrl: avatar("ExploradorAnatomia", "edb98a"),
-      previewImagemUrl: avatar("ExploradorAnatomia", "edb98a"),
-      ativo: true,
-      disponivelNaLoja: false,
-      excluidoEm: null,
-    },
-    create: {
-      codigo: "avatar-explorador-anatomia",
-      nome: "Explorador da Anatomia",
-      descricao: "Avatar exclusivo para quem conquistou seus primeiros cinco acertos.",
-      tipo: TipoItemLoja.AVATAR,
-      precoMoedas: 0,
-      imagemUrl: avatar("ExploradorAnatomia", "edb98a"),
-      previewImagemUrl: avatar("ExploradorAnatomia", "edb98a"),
-      ativo: true,
-      disponivelNaLoja: false,
-    },
-  });
-
-  await prisma.recompensaItemConquista.upsert({
-    where: {
-      conquistaId_tier: {
-        conquistaId: "total-acertos",
-        tier: TierConquista.BRONZE,
-      },
-    },
-    update: {
-      itemLojaId: avatarExclusivo.id,
-    },
-    create: {
-      conquistaId: "total-acertos",
-      tier: TierConquista.BRONZE,
-      itemLojaId: avatarExclusivo.id,
-    },
-  });
-
-  console.log("Itens da loja virtual (cosméticos) criados com sucesso.");
-  console.log("Avatar exclusivo associado a conquista Primeiros 5 Acertos.");
+  // Catalogo completo (itens de avatar, consumiveis) e recompensa da conquista
+  // "Primeiros 5 Acertos" (oculos de sol) vem da sincronizacao do catalogo.
+  await sincronizarCatalogo();
 
   // 2. Criando Temas
   const temas = {
@@ -742,9 +613,11 @@ async function main() {
 main()
   .then(async () => {
     await prisma.$disconnect();
+    await desconectarCatalogo();
   })
   .catch(async (e) => {
     console.error(e);
     await prisma.$disconnect();
+    await desconectarCatalogo();
     process.exit(1);
   });
