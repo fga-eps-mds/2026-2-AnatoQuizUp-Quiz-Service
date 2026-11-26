@@ -434,4 +434,71 @@ describe("Testa Loja Service", () => {
 
     expect(resultado.uso.efeito).toBe("Potencializador ativo.");
   });
+
+  describe("itens novos do avatar", () => {
+    const itensNovos = [
+      criarItemLoja({ id: "cabelo-id", codigo: "trancas", nome: "Tranças", tipo: TipoItemLoja.CABELO, precoMoedas: 150 }),
+      criarItemLoja({ id: "acessorio-id", codigo: "chapeu-cowboy", nome: "Chapéu de Cowboy", tipo: TipoItemLoja.ACESSORIO, precoMoedas: 160 }),
+      criarItemLoja({ id: "luva-id", codigo: "luva-goleiro", nome: "Luva de Goleiro", tipo: TipoItemLoja.LUVA, precoMoedas: 120 }),
+      criarItemLoja({ id: "calcado-id", codigo: "bota-coturno", nome: "Bota Coturno", tipo: TipoItemLoja.CALCADO, precoMoedas: 140 }),
+    ];
+
+    test("lista os quatro tipos novos no catalogo com codigo, tipo e preco", async () => {
+      repository.listarCatalogo.mockResolvedValue({
+        data: itensNovos,
+        total: itensNovos.length,
+        quantidadesPossuidas: new Map(),
+      });
+
+      const resultado = await service.listarCatalogo("usuario-id", { page: 1, limit: 10 });
+
+      expect(resultado.dados).toEqual(
+        itensNovos.map((item) =>
+          expect.objectContaining({
+            codigo: item.codigo,
+            tipo: item.tipo,
+            precoMoedas: item.precoMoedas,
+            adquirido: false,
+          }),
+        ),
+      );
+    });
+
+    test.each([TipoItemLoja.CABELO, TipoItemLoja.ACESSORIO, TipoItemLoja.LUVA, TipoItemLoja.CALCADO])(
+      "repassa o filtro por tipo %s ao repository",
+      async (tipo) => {
+        repository.listarCatalogo.mockResolvedValue({ data: [], total: 0, quantidadesPossuidas: new Map() });
+
+        await service.listarCatalogo("usuario-id", { tipo, page: 1, limit: 10 });
+
+        expect(repository.listarCatalogo).toHaveBeenCalledWith(
+          "usuario-id",
+          expect.anything(),
+          expect.objectContaining({ tipo }),
+        );
+      },
+    );
+
+    test.each(itensNovos.map((item) => [item.tipo, item] as const))(
+      "compra um item do tipo %s uma unica vez",
+      async (_tipo, item) => {
+        repository.comprarItem.mockResolvedValue({
+          saldoMoedas: 1000 - item.precoMoedas,
+          inventarioItem: criarInventario({ itemLojaId: item.id, itemLoja: item }),
+        });
+
+        const resultado = await service.comprar("usuario-id", item.id);
+
+        expect(repository.comprarItem).toHaveBeenCalledTimes(1);
+        expect(repository.comprarItem).toHaveBeenCalledWith("usuario-id", item.id, 1);
+        expect(resultado).toEqual(
+          expect.objectContaining({
+            saldoMoedas: 1000 - item.precoMoedas,
+            quantidadeComprada: 1,
+            item: expect.objectContaining({ item: expect.objectContaining({ codigo: item.codigo, tipo: item.tipo }) }),
+          }),
+        );
+      },
+    );
+  });
 });

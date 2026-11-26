@@ -37,6 +37,9 @@ describe("Testa Loja Schemas", () => {
         "PLANO_FUNDO",
         "ROSTO",
         "CABELO",
+        "ACESSORIO",
+        "LUVA",
+        "CALCADO",
         "DICA",
         "POTENCIALIZADOR",
       ]) {
