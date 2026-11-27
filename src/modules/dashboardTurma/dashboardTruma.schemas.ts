@@ -30,6 +30,11 @@ export const schemaParamsListaDashboard = z.object({
   }),
 });
 
+// Params do detalhamento de uma entrega: turma, publicacao e aluno consultados.
+export const schemaParamsDetalheEntrega = schemaParamsHistoricoAluno.extend({
+  listaId: z.string().trim().min(1),
+});
+
 export const schemaParamsEvolucaoTemas = schemaParamsDashboard.extend({
   alunoId: z.string({
     message: 'O ID do aluno é obrigatório.',

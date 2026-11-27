@@ -233,4 +233,46 @@ describe('TurmaDashboardRepository', () => {
     });
     expect(result).toEqual(mockListas);
   });
+
+  it('deve buscar a entrega somente quando professor, turma e aluno estiverem vinculados', async () => {
+    const mockEntrega = { id: 'lista-turma-1' };
+    (prismaMock.listaTurma.findFirst as jest.Mock).mockResolvedValue(mockEntrega);
+
+    const result = await repository.findEntregaDoAluno(
+      'turma-123',
+      'lista-turma-1',
+      'aluno-123',
+      'professor-123',
+    );
+
+    expect(prismaMock.listaTurma.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'lista-turma-1',
+        turmaId: 'turma-123',
+        turma: {
+          professorId: 'professor-123',
+          alunos: { some: { alunoId: 'aluno-123' } },
+        },
+      },
+      include: {
+        listaQuestao: {
+          include: {
+            itens: {
+              orderBy: { ordem: 'asc' },
+              include: {
+                questao: {
+                  include: { alternativas: true },
+                },
+              },
+            },
+          },
+        },
+        resolucoes: {
+          where: { alunoId: 'aluno-123', status: 'SUBMETIDA' },
+          include: { respostas: true },
+        },
+      },
+    });
+    expect(result).toEqual(mockEntrega);
+  });
 });

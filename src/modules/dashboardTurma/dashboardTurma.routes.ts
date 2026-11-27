@@ -7,6 +7,7 @@ import { TurmaDashboardService } from './dashboardTurma.service';
 import { TurmaDashboardController } from './dashboardTurma.controller';
 import {
   schemaParamsDashboard,
+  schemaParamsDetalheEntrega,
   schemaParamsHistoricoAluno,
   schemaParamsEvolucaoTemas,
   schemaParamsListaDashboard,
@@ -53,6 +54,14 @@ dashboardRouter.get(
   apenasGestao,
   validarRequisicao(schemaParamsListaDashboard, 'params'),
   turmaDashboardController.listarDesempenhoListaIndividual
+);
+
+// GET resultado de uma entrega. A associacao professor/turma/aluno/lista e validada no service.
+dashboardRouter.get(
+  '/:id/listas/:listaId/alunos/:alunoId/entrega',
+  middlewarePapeis(PAPEIS.PROFESSOR),
+  validarRequisicao(schemaParamsDetalheEntrega, 'params'),
+  turmaDashboardController.detalharEntrega,
 );
 
 dashboardRouter.get(

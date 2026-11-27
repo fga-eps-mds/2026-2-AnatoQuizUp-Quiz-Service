@@ -2,6 +2,30 @@ import { PAPEIS } from '@/shared/constants/papeis';
 import { CodigoDeErro } from '@/shared/errors/codigos-de-erro';
 import { ErroAplicacao } from '@/shared/errors/erro-aplicacao';
 import type { TurmaDashboardRepository } from './dashboardTurma.repository';
+import type { AlternativaQuestao } from '@prisma/client';
+
+type AlternativasDaQuestao = {
+  alternativaA: string;
+  alternativaB: string;
+  alternativaC: string;
+  alternativaD: string;
+  alternativaE: string;
+};
+
+const textoAlternativa = (alternativas: AlternativasDaQuestao | null, alternativa: AlternativaQuestao) => {
+  if (!alternativas) return alternativa;
+
+  const textos: Record<string, string> = {
+    A: alternativas.alternativaA,
+    B: alternativas.alternativaB,
+    C: alternativas.alternativaC,
+    D: alternativas.alternativaD,
+    E: alternativas.alternativaE,
+  };
+
+  return textos[alternativa] ?? alternativa;
+};
+
 import type {
   DesempenhoListaDTO,
   EvolucaoTemaDTO,
@@ -18,6 +42,7 @@ const mensagemComparacao = (totalResultadosValidos: number): string | null => {
   }
   return null;
 };
+
 
 /**
  * Service do dashboard da turma (visao do professor).
@@ -320,6 +345,106 @@ export class TurmaDashboardService {
       nomeLista: listaTurma.listaQuestao.nome,
       totalQuestoes,
       desempenhoAlunos: alunos,
+    };
+  }
+
+  /**
+   * Detalha uma entrega submetida com os resultados de cada questao.
+   * Questoes sem resposta ficam separadas dos erros, mas entram no total da taxa.
+   */
+  async getDetalheEntrega(
+    turmaId: string,
+    listaTurmaId: string,
+    alunoId: string,
+    professorId: string,
+  ) {
+    const listaTurma = await this.repository.findEntregaDoAluno(
+      turmaId,
+      listaTurmaId,
+      alunoId,
+      professorId,
+    );
+
+    const resolucao = listaTurma?.resolucoes[0];
+    if (!listaTurma || !resolucao) {
+      throw new ErroAplicacao({
+        codigoStatus: 404,
+        codigo: 'NAO_ENCONTRADO',
+        mensagem: 'Entrega não encontrada ou sem acesso.',
+      });
+    }
+
+    const respostasPorQuestao = new Map<string, AlternativaQuestao>(
+      resolucao.respostas.map((resposta) => [resposta.questaoId, resposta.respostaMarcada]),
+    );
+
+    let acertos = 0;
+    let erros = 0;
+    let naoRespondidas = 0;
+
+    const questoes = listaTurma.listaQuestao.itens.map((item) => {
+      const questao = item.questao;
+      const respostaMarcada = respostasPorQuestao.get(questao.id) ?? null;
+
+      if (!respostaMarcada) {
+        naoRespondidas += 1;
+        return {
+          ordem: item.ordem,
+          questaoId: questao.id,
+          enunciado: questao.enunciado,
+          respostaAluno: null,
+          resultado: 'NAO_RESPONDIDA' as const,
+          gabarito: null,
+        };
+      }
+
+      const respostaAluno = {
+        alternativa: respostaMarcada,
+        texto: textoAlternativa(questao.alternativas, respostaMarcada),
+      };
+
+      if (respostaMarcada === questao.respostaCorreta) {
+        acertos += 1;
+        return {
+          ordem: item.ordem,
+          questaoId: questao.id,
+          enunciado: questao.enunciado,
+          respostaAluno,
+          resultado: 'ACERTO' as const,
+          gabarito: null,
+        };
+      }
+
+      erros += 1;
+      return {
+        ordem: item.ordem,
+        questaoId: questao.id,
+        enunciado: questao.enunciado,
+        respostaAluno,
+        resultado: 'ERRO' as const,
+        gabarito: {
+          alternativa: questao.respostaCorreta,
+          texto: textoAlternativa(questao.alternativas, questao.respostaCorreta),
+        },
+      };
+    });
+
+    const totalQuestoes = questoes.length;
+    return {
+      lista: {
+        id: listaTurma.id,
+        nome: listaTurma.listaQuestao.nome,
+        publicadaEm: listaTurma.criadoEm.toISOString(),
+      },
+      alunoId,
+      resumo: {
+        totalQuestoes,
+        acertos,
+        erros,
+        naoRespondidas,
+        taxaAcerto: totalQuestoes > 0 ? Math.round((acertos / totalQuestoes) * 100) : 0,
+      },
+      questoes,
     };
   }
 

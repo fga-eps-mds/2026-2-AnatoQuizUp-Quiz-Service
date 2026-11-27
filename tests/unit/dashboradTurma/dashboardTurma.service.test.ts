@@ -376,6 +376,46 @@ describe('TurmaDashboardService', () => {
     });
   });
 
+  describe('getDetalheEntrega', () => {
+    it('deve separar acertos, erros e questoes nao respondidas e manter o total na taxa', async () => {
+      repoMock.findEntregaDoAluno.mockResolvedValue({
+        id: 'lista-turma-1',
+        criadoEm: new Date('2026-11-18T10:00:00.000Z'),
+        listaQuestao: {
+          nome: 'Neuroanatomia aplicada',
+          itens: [
+            { ordem: 1, questao: { id: 'questao-1', enunciado: 'Questao correta', respostaCorreta: 'A', alternativas: { alternativaA: 'Pia-mater', alternativaB: 'Dura-mater', alternativaC: 'Aracnoide', alternativaD: 'Ventriculo', alternativaE: 'Cerebelo' } } },
+            { ordem: 2, questao: { id: 'questao-2', enunciado: 'Questao errada', respostaCorreta: 'C', alternativas: { alternativaA: 'A', alternativaB: 'B', alternativaC: 'Gabarito C', alternativaD: 'D', alternativaE: 'E' } } },
+            { ordem: 3, questao: { id: 'questao-3', enunciado: 'Questao em branco', respostaCorreta: 'B', alternativas: { alternativaA: 'A', alternativaB: 'Gabarito B', alternativaC: 'C', alternativaD: 'D', alternativaE: 'E' } } },
+          ],
+        },
+        resolucoes: [{
+          respostas: [
+            { questaoId: 'questao-1', respostaMarcada: 'A' },
+            { questaoId: 'questao-2', respostaMarcada: 'B' },
+          ],
+        }],
+      } as unknown as Awaited<ReturnType<TurmaDashboardRepository['findEntregaDoAluno']>>);
+
+      const result = await service.getDetalheEntrega('turma-1', 'lista-turma-1', 'aluno-1', 'professor-1');
+
+      expect(repoMock.findEntregaDoAluno).toHaveBeenCalledWith('turma-1', 'lista-turma-1', 'aluno-1', 'professor-1');
+      expect(result.resumo).toEqual({ totalQuestoes: 3, acertos: 1, erros: 1, naoRespondidas: 1, taxaAcerto: 33 });
+      expect(result.questoes[0]).toMatchObject({ resultado: 'ACERTO', respostaAluno: { alternativa: 'A', texto: 'Pia-mater' }, gabarito: null });
+      expect(result.questoes[1]).toMatchObject({ resultado: 'ERRO', respostaAluno: { alternativa: 'B', texto: 'B' }, gabarito: { alternativa: 'C', texto: 'Gabarito C' } });
+      expect(result.questoes[2]).toMatchObject({ resultado: 'NAO_RESPONDIDA', respostaAluno: null, gabarito: null });
+    });
+
+    it('deve recusar uma entrega inexistente ou sem vinculo autorizado', async () => {
+      repoMock.findEntregaDoAluno.mockResolvedValue(null);
+
+      await expect(service.getDetalheEntrega('turma-1', 'lista-1', 'aluno-1', 'professor-sem-acesso')).rejects.toMatchObject({
+        codigoStatus: 404,
+        codigo: 'NAO_ENCONTRADO',
+      });
+    });
+  });
+
   describe('getTopQuestoesComMaisErros', () => {
     it('retorna no máximo 3 questões, ordenadas por erros e desempate por número', async () => {
       const mockLista = {
