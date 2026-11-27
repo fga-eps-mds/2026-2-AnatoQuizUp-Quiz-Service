@@ -61,12 +61,12 @@ describe("UsoItemRepository.listarHistorico", () => {
     expect(historicoB.data).toEqual([registros[1]]);
     expect(historicoB.total).toBe(1);
     expect(findMany.mock.calls.map(([args]) => args.where)).toEqual([
-      { usuarioId: "usuario-A" },
-      { usuarioId: "usuario-B" },
+      { usuarioId: "usuario-A", itemLoja: { excluidoEm: null } },
+      { usuarioId: "usuario-B", itemLoja: { excluidoEm: null } },
     ]);
     expect(count.mock.calls.map(([args]) => args.where)).toEqual([
-      { usuarioId: "usuario-A" },
-      { usuarioId: "usuario-B" },
+      { usuarioId: "usuario-A", itemLoja: { excluidoEm: null } },
+      { usuarioId: "usuario-B", itemLoja: { excluidoEm: null } },
     ]);
   });
 
@@ -74,7 +74,7 @@ describe("UsoItemRepository.listarHistorico", () => {
     const repository = new UsoItemRepository();
     await expect(repository.listarHistoricoCompleto("usuario-A")).resolves.toEqual([registros[0]]);
     expect(findMany).toHaveBeenLastCalledWith({
-      where: { usuarioId: "usuario-A" },
+      where: { usuarioId: "usuario-A", itemLoja: { excluidoEm: null } },
       include: { itemLoja: true },
       orderBy: { ativadoEm: "desc" },
     });

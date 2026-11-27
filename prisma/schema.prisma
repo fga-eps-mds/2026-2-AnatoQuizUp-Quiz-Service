@@ -41,6 +41,8 @@ enum FonteMoeda {
   DESBLOQUEIO_CONQUISTA
   COMPRA_ITEM
   USO_POTENCIALIZADOR
+  // Devolucao do ATP gasto em item removido da loja (US39).
+  REEMBOLSO_ITEM
 }
 
 enum StatusTentativaQuiz {

@@ -164,6 +164,7 @@ describe("Testa Loja Repository", () => {
         usuarioId: "usuario-id",
         fonte: FonteMoeda.COMPRA_ITEM,
         itemLojaId: { not: null },
+        itemLoja: { excluidoEm: null },
       },
       include: { itemLoja: true },
       orderBy: { criadoEm: "desc" },
