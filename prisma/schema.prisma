@@ -818,9 +818,7 @@ enum StatusCasoOsce {
   PUBLICADO
 }
 
-// Caso clinico cadastrado pelo professor para a simulacao OSCE (US26). So os campos
-// estruturados do protocolo (dados gerais, contextualizacao e roteiro do paciente);
-// a rubrica de avaliacao pertence a outra US (US27) e nao mora aqui.
+// o checklist e as regras de nota ficam nos models relacionados (US27).
 model CasoOsce {
   id String @id @default(cuid())
 
@@ -846,6 +844,8 @@ model CasoOsce {
   criadoPorId String
 
   exames ExameCasoOsce[]
+  itensChecklist        ItemChecklistOsce[]
+  configuracaoAvaliacao ConfiguracaoAvaliacaoOsce?
 
   criadoEm     DateTime  @default(now())
   atualizadoEm DateTime  @updatedAt
@@ -868,4 +868,51 @@ model ExameCasoOsce {
   criadoEm DateTime @default(now())
 
   @@map("exames_caso_osce")
+}
+
+// Item do checklist de avaliacao de um caso OSCE (US27).
+model ItemChecklistOsce {
+  id String @id @default(cuid())
+
+  dominio            String
+  nome               String
+  criterioCompleto   String
+  criterioParcial    String? // sem valor = item sem credito parcial
+  peso               Int // 1 ou 2, validado no schema zod
+  critico            Boolean @default(false)
+  comentarioFeedback String?
+  ordem              Int
+
+  casoOsceId String
+  casoOsce   CasoOsce @relation(fields: [casoOsceId], references: [id], onDelete: Cascade)
+
+  criadoEm DateTime @default(now())
+
+  @@index([casoOsceId])
+  @@map("itens_checklist_osce")
+}
+
+// Regras de nota e liberacao do resultado de um caso OSCE (US27), uma por caso.
+model ConfiguracaoAvaliacaoOsce {
+  id String @id @default(cuid())
+
+  // Percentual minimo de cada faixa do checklist.
+  faixaExcelente   Int @default(90)
+  faixaBom         Int @default(75)
+  faixaSuficiente  Int @default(60)
+  faixaLimitrofe   Int @default(50)
+  corteAprovacao   Int @default(60)
+  // Item critico nao cumprido limita a faixa a "Limitrofe" e reprova.
+  itemCriticoReprova Boolean @default(true)
+  // Rotulos da escala global (0 a 4); nulo = usar o padrao.
+  escalaGlobal     Json?
+  liberarResultado Boolean @default(true)
+
+  casoOsceId String   @unique
+  casoOsce   CasoOsce @relation(fields: [casoOsceId], references: [id], onDelete: Cascade)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@map("configuracoes_avaliacao_osce")
 }

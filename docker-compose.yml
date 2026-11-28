@@ -13,7 +13,7 @@ services:
       - quiz_postgres_data:/var/lib/postgresql
 
   minio:
-    image: minio/minio
+    image: minio/minio:latest
     container_name: anatoquizup-quiz-minio
     ports:
       - "${MINIO_API_PORT:-9000}:9000"
