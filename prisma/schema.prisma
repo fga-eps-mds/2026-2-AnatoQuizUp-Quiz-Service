@@ -870,7 +870,9 @@ model ExameCasoOsce {
   @@map("exames_caso_osce")
 }
 
-// Item do checklist de avaliacao de um caso OSCE (US27).
+// Caso clinico cadastrado pelo professor para a simulacao OSCE (US26). So os campos
+// estruturados do protocolo (dados gerais, contextualizacao e roteiro do paciente);
+// o checklist e as regras de nota ficam nos models relacionados (US27).
 model ItemChecklistOsce {
   id String @id @default(cuid())
 
