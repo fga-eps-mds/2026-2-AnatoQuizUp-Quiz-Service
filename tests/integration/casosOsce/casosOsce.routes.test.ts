@@ -172,6 +172,66 @@ describe("Testes de Integração - Casos OSCE", () => {
     });
   });
 
+    describe("PUT /api/v1/casos-osce/:id/checklist", () => {
+    const item = (nome: string) => ({ dominio: "Encerramento", nome, criterioCompleto: "Faz.", peso: 1 });
+
+    it("salva, reordena e remove itens", async () => {
+      const caso = await prisma.casoOsce.create({ data: { criadoPorId: "prof-osce-123" } });
+      const url = `/api/v1/casos-osce/${caso.id}/checklist`;
+
+      await request(app).put(url).send({ itens: [item("A"), item("B"), item("C")] });
+      const response = await request(app).put(url).send({ itens: [item("C"), item("A")] });
+
+      expect(response.status).toBe(200);
+      const busca = await request(app).get(`/api/v1/casos-osce/${caso.id}`);
+      const body = busca.body as RespostaApiSucesso<RespostaCasoOsceDto>;
+      expect(body.dados.itensChecklist.map((i) => i.nome)).toEqual(["C", "A"]);
+      expect(body.dados.itensChecklist[0]?.criterioParcial).toBeNull();
+    });
+
+    it("responde 404 para caso inexistente", async () => {
+      const response = await request(app).put("/api/v1/casos-osce/nao-existe/checklist").send({ itens: [] });
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe("PUT /api/v1/casos-osce/:id/avaliacao", () => {
+    const configuracao = {
+      faixaExcelente: 90,
+      faixaBom: 75,
+      faixaSuficiente: 60,
+      faixaLimitrofe: 50,
+      corteAprovacao: 60,
+      itemCriticoReprova: true,
+      escalaGlobal: ["0", "1", "2", "3", "4"],
+    };
+
+    it("cria e depois atualiza a configuracao", async () => {
+      const caso = await prisma.casoOsce.create({ data: { criadoPorId: "prof-osce-123" } });
+      const url = `/api/v1/casos-osce/${caso.id}/avaliacao`;
+
+      await request(app).put(url).send(configuracao);
+      const response = await request(app)
+        .put(url)
+        .send({ ...configuracao, corteAprovacao: 70, liberarResultado: false });
+
+      expect(response.status).toBe(200);
+      const body = response.body as RespostaApiSucesso<RespostaCasoOsceDto>;
+      expect(body.dados.configuracaoAvaliacao).toMatchObject({ corteAprovacao: 70, liberarResultado: false });
+    });
+
+    it("responde 400 para faixas fora de ordem", async () => {
+      const caso = await prisma.casoOsce.create({ data: { criadoPorId: "prof-osce-123" } });
+
+      const response = await request(app)
+        .put(`/api/v1/casos-osce/${caso.id}/avaliacao`)
+        .send({ ...configuracao, faixaBom: 95 });
+
+      expect(response.status).toBe(400);
+    });
+  });
+  
   describe("DELETE /api/v1/casos-osce/:id", () => {
     it("responde 404 para id inexistente", async () => {
       const response = await request(app).delete("/api/v1/casos-osce/id-que-nao-existe");

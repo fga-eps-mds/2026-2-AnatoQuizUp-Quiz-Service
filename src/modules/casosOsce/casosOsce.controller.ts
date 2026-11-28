@@ -64,4 +64,22 @@ export class CasoOsceController {
       return next(error);
     }
   };
+
+    salvarChecklist = async (request: Request<{ id: string }>, response: Response, next: NextFunction) => {
+    try {
+      const caso = await this.casoOsceService.salvarChecklist(request.params.id, request.body);
+      return response.status(200).json({ mensagem: MENSAGENS.casoOsceAtualizado, dados: caso });
+    } catch (error) {
+      return next(error);
+    }
+  };
+
+  salvarConfiguracao = async (request: Request<{ id: string }>, response: Response, next: NextFunction) => {
+    try {
+      const caso = await this.casoOsceService.salvarConfiguracao(request.params.id, request.body);
+      return response.status(200).json({ mensagem: MENSAGENS.casoOsceAtualizado, dados: caso });
+    } catch (error) {
+      return next(error);
+    }
+  };
 }

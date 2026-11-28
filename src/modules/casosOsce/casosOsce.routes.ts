@@ -8,9 +8,11 @@ import { CasoOsceController } from "./casosOsce.controller";
 import { CasoOsceRepository } from "./casosOsce.repository";
 import { CasoOsceService } from "./casosOsce.service";
 import {
-  schemaBuscarCasoOscePorId,
+  schemaBuscarCasoOscePorId, 
   schemaListarCasosOsce,
   schemaSalvarCasoOsce,
+  schemaSalvarChecklist,
+  schemaSalvarConfiguracaoAvaliacao,
 } from "./casosOsce.schemas";
 
 const casoOsceRepository = new CasoOsceRepository();
@@ -41,6 +43,20 @@ casoOsceRouter.patch(
   validarRequisicao(schemaBuscarCasoOscePorId, "params"),
   validarRequisicao(schemaSalvarCasoOsce),
   casoOsceController.atualizar,
+);
+
+casoOsceRouter.put(
+  "/:id/checklist",
+  validarRequisicao(schemaBuscarCasoOscePorId, "params"),
+  validarRequisicao(schemaSalvarChecklist),
+  casoOsceController.salvarChecklist,
+);
+
+casoOsceRouter.put(
+  "/:id/avaliacao",
+  validarRequisicao(schemaBuscarCasoOscePorId, "params"),
+  validarRequisicao(schemaSalvarConfiguracaoAvaliacao),
+  casoOsceController.salvarConfiguracao,
 );
 
 casoOsceRouter.delete(
