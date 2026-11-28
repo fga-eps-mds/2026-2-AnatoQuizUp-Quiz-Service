@@ -34,3 +34,40 @@ export const schemaListarCasosOsce = z.object({
 export const schemaBuscarCasoOscePorId = z.object({
   id: z.string().trim().min(1),
 });
+
+// Avaliacao do caso (US27): checklist e regras de nota.
+const itemChecklist = z.object({
+  dominio: z.string().trim().min(1).max(200),
+  nome: z.string().trim().min(1).max(300),
+  criterioCompleto: z.string().trim().min(1).max(2000),
+  criterioParcial: z.string().trim().min(1).max(2000).optional(),
+  peso: z.literal([1, 2]),
+  critico: z.boolean().default(false),
+  comentarioFeedback: z.string().trim().min(1).max(2000).optional(),
+});
+
+// A lista e enviada inteira; a posicao de cada item define a ordem.
+export const schemaSalvarChecklist = z.object({
+  itens: z.array(itemChecklist).max(50),
+});
+
+const percentual = z.number().int().min(0).max(100);
+
+export const schemaSalvarConfiguracaoAvaliacao = z
+  .object({
+    faixaExcelente: percentual,
+    faixaBom: percentual,
+    faixaSuficiente: percentual,
+    faixaLimitrofe: percentual,
+    corteAprovacao: percentual,
+    itemCriticoReprova: z.boolean(),
+    escalaGlobal: z.array(z.string().trim().min(1).max(100)).length(5),
+    liberarResultado: z.boolean().default(true),
+  })
+  .refine(
+    (c) =>
+      c.faixaExcelente > c.faixaBom &&
+      c.faixaBom > c.faixaSuficiente &&
+      c.faixaSuficiente > c.faixaLimitrofe,
+    { message: "As faixas devem estar em ordem decrescente.", path: ["faixaExcelente"] },
+  );
