@@ -12,6 +12,8 @@ import type {
   ListarCasosOsceQueryDto,
   RespostaCasoOsceDto,
   SalvarCasoOsceDto,
+  ConfiguracaoAvaliacaoDto,
+  SalvarChecklistDto,
 } from "./dto/casoOsce.types";
 import type { CasoOsceRepository } from "./casosOsce.repository";
 
@@ -98,5 +100,22 @@ export class CasoOsceService {
       mensagem: MENSAGENS.casoOsceNaoEncontrado,
       detalhes: { id },
     });
+  }
+
+    // Salva o checklist do caso (404 se o caso nao existir).
+  async salvarChecklist(id: string, { itens }: SalvarChecklistDto): Promise<RespostaCasoOsceDto> {
+    await this.buscarPorId(id);
+    const caso = await this.casoOsceRepository.salvarChecklist(id, itens);
+    return converterParaRespostaCasoOsce(caso);
+  }
+
+  // Salva as regras de nota e a liberacao do resultado (404 se o caso nao existir).
+  async salvarConfiguracao(
+    id: string,
+    configuracao: ConfiguracaoAvaliacaoDto,
+  ): Promise<RespostaCasoOsceDto> {
+    await this.buscarPorId(id);
+    const caso = await this.casoOsceRepository.salvarConfiguracao(id, configuracao);
+    return converterParaRespostaCasoOsce(caso);
   }
 }

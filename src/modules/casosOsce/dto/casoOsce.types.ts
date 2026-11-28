@@ -1,7 +1,18 @@
-import type { CasoOsce, Dificuldade, ExameCasoOsce, StatusCasoOsce } from "@prisma/client";
+import type {
+  CasoOsce,
+  ConfiguracaoAvaliacaoOsce,
+  Dificuldade,
+  ExameCasoOsce,
+  ItemChecklistOsce,
+  StatusCasoOsce,
+} from "@prisma/client";
 
 // Registro completo (com exames) retornado pelo repository.
-export type RegistroCasoOsceCompleto = CasoOsce & { exames: ExameCasoOsce[] };
+export type RegistroCasoOsceCompleto = CasoOsce & {
+  exames: ExameCasoOsce[];
+  itensChecklist: ItemChecklistOsce[];
+  configuracaoAvaliacao: ConfiguracaoAvaliacaoOsce | null;
+};
 
 export type ExameCasoOsceDto = {
   nome: string;
@@ -49,6 +60,8 @@ export type RespostaCasoOsceDto = {
   status: StatusCasoOsce;
   criadoPorId: string;
   exames: ExameCasoOsceDto[];
+  itensChecklist: ItemChecklistDto[];           
+  configuracaoAvaliacao: ConfiguracaoAvaliacaoDto | null; 
   criadoEm: Date;
   atualizadoEm: Date;
 };
@@ -73,7 +86,51 @@ export function converterParaRespostaCasoOsce(
     status: caso.status,
     criadoPorId: caso.criadoPorId,
     exames: caso.exames.map((exame) => ({ nome: exame.nome, resultado: exame.resultado })),
+    itensChecklist: caso.itensChecklist.map((item) => ({
+      dominio: item.dominio,
+      nome: item.nome,
+      criterioCompleto: item.criterioCompleto,
+      criterioParcial: item.criterioParcial,
+      peso: item.peso,
+      critico: item.critico,
+      comentarioFeedback: item.comentarioFeedback,
+    })),
+    configuracaoAvaliacao: caso.configuracaoAvaliacao
+      ? {
+          faixaExcelente: caso.configuracaoAvaliacao.faixaExcelente,
+          faixaBom: caso.configuracaoAvaliacao.faixaBom,
+          faixaSuficiente: caso.configuracaoAvaliacao.faixaSuficiente,
+          faixaLimitrofe: caso.configuracaoAvaliacao.faixaLimitrofe,
+          corteAprovacao: caso.configuracaoAvaliacao.corteAprovacao,
+          itemCriticoReprova: caso.configuracaoAvaliacao.itemCriticoReprova,
+          escalaGlobal: caso.configuracaoAvaliacao.escalaGlobal as string[],
+          liberarResultado: caso.configuracaoAvaliacao.liberarResultado,
+        }
+      : null,
     criadoEm: caso.criadoEm,
     atualizadoEm: caso.atualizadoEm,
   };
 }
+
+export type ItemChecklistDto = {
+  dominio: string;
+  nome: string;
+  criterioCompleto: string;
+  criterioParcial?: string | null;
+  peso: number;
+  critico: boolean;
+  comentarioFeedback?: string | null;
+};
+
+export type SalvarChecklistDto = { itens: ItemChecklistDto[] };
+
+export type ConfiguracaoAvaliacaoDto = {
+  faixaExcelente: number;
+  faixaBom: number;
+  faixaSuficiente: number;
+  faixaLimitrofe: number;
+  corteAprovacao: number;
+  itemCriticoReprova: boolean;
+  escalaGlobal: string[];
+  liberarResultado: boolean;
+};

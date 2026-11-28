@@ -1,9 +1,13 @@
 import { prisma } from "@/config/db";
 import type { ParametrosPaginacao } from "@/shared/utils/paginacao.util";
 
-import type { RegistroCasoOsceCompleto, SalvarCasoOsceDto } from "./dto/casoOsce.types";
+import type { RegistroCasoOsceCompleto, SalvarCasoOsceDto, ConfiguracaoAvaliacaoDto, ItemChecklistDto } from "./dto/casoOsce.types";
 
-const includeExames = { exames: true } as const;
+const includeCompleto = {
+  exames: true,
+  itensChecklist: { orderBy: { ordem: "asc" } },
+  configuracaoAvaliacao: true,
+} as const;
 
 export class CasoOsceRepository {
   /**
@@ -19,7 +23,7 @@ export class CasoOsceRepository {
     const [data, total] = await prisma.$transaction([
       prisma.casoOsce.findMany({
         where,
-        include: includeExames,
+        include: includeCompleto,
         skip: paginacao.skip,
         take: paginacao.limit,
         orderBy: { criadoEm: "desc" },
@@ -39,7 +43,7 @@ export class CasoOsceRepository {
   async buscarPorId(id: string) {
     return prisma.casoOsce.findFirst({
       where: { id, excluidoEm: null },
-      include: includeExames,
+      include: includeCompleto,
     }) as Promise<RegistroCasoOsceCompleto | null>;
   }
 
@@ -59,7 +63,7 @@ export class CasoOsceRepository {
         criadoPorId,
         exames: exames ? { create: exames } : undefined,
       },
-      include: includeExames,
+      include: includeCompleto,
     }) as Promise<RegistroCasoOsceCompleto>;
   }
 
@@ -85,7 +89,7 @@ export class CasoOsceRepository {
             }
           : undefined,
       },
-      include: includeExames,
+      include: includeCompleto,
     }) as Promise<RegistroCasoOsceCompleto>;
   }
 
@@ -99,5 +103,32 @@ export class CasoOsceRepository {
       where: { id },
       data: { excluidoEm: new Date() },
     });
+  }
+
+  // Substitui o checklist inteiro; a posicao na lista vira a ordem.
+  async salvarChecklist(id: string, itens: ItemChecklistDto[]) {
+    return prisma.casoOsce.update({
+      where: { id },
+      data: {
+        itensChecklist: {
+          deleteMany: {},
+          create: itens.map((item, ordem) => ({ ...item, ordem })),
+        },
+      },
+      include: includeCompleto,
+    }) as Promise<RegistroCasoOsceCompleto>;
+  }
+
+  // Cria ou atualiza as regras de nota do caso.
+  async salvarConfiguracao(id: string, configuracao: ConfiguracaoAvaliacaoDto) {
+    return prisma.casoOsce.update({
+      where: { id },
+      data: {
+        configuracaoAvaliacao: {
+          upsert: { create: configuracao, update: configuracao },
+        },
+      },
+      include: includeCompleto,
+    }) as Promise<RegistroCasoOsceCompleto>;
   }
 }
